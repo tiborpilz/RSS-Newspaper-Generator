@@ -33,7 +33,8 @@ async fn main() {
 
     let app = Router::new()
         .route("/", get(root))
-        .route("/feed", post(feed));
+        .route("/feeds", get(get_feeds))
+        .route("/feeds", post(post_feed));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
 
@@ -77,13 +78,12 @@ async fn connect_db() -> SqlitePool {
 // Initial template
 #[derive(Template)]
 #[template(path = "root.html")]
-struct RootTemplate<'a> {
-    name: &'a str,
+struct RootTemplate {
 }
 
 async fn root() -> Html<String> {
     info!("Entering root handler");
-    let result = RootTemplate { name: "World" }.render().unwrap();
+    let result = RootTemplate { }.render().unwrap();
     return Html(result);
 }
 
@@ -99,7 +99,16 @@ struct FeedParams {
     url: String,
 }
 
-async fn feed(feed: Form<FeedParams>) -> (StatusCode, String) {
+async fn get_feeds_from_db() -> Vec<Feed> {
+    let pool = connect_db().await;
+    let feeds = sqlx::query_as::<_, Feed>("SELECT * FROM feeds")
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+    return feeds;
+}
+
+async fn post_feed(feed: Form<FeedParams>) -> (StatusCode, String) {
     info!("Entering feed handler");
 
     info!("URL: {}", feed.url);
@@ -111,11 +120,14 @@ async fn feed(feed: Form<FeedParams>) -> (StatusCode, String) {
         .execute(&pool)
         .await;
 
-    let feeds = sqlx::query_as::<_, Feed>("SELECT * FROM feeds")
-        .fetch_all(&pool)
-        .await
-        .unwrap();
+    let feeds = get_feeds_from_db().await;
 
     let result = FeedTemplate { feeds: &feeds }.render().unwrap();
     return (StatusCode::OK, result);
+}
+
+async fn get_feeds() -> Html<String> {
+    let feeds = get_feeds_from_db().await;
+    let result = FeedTemplate { feeds: &feeds }.render().unwrap();
+    return Html(result);
 }
