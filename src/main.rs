@@ -1,14 +1,9 @@
 use axum::{
-    routing::{
-        get,
-        post,
-        delete,
-    },
     extract::Path,
     http::StatusCode,
     response::Html,
-    Router,
-    Form,
+    routing::{delete, get, post},
+    Form, Router,
 };
 
 use std::net::SocketAddr;
@@ -20,13 +15,12 @@ use serde::Deserialize;
 use tracing::info;
 use tracing_subscriber;
 
-use sqlx::sqlite::{
-    SqliteConnectOptions,
-    SqlitePool,
-};
+use sqlx::sqlite::{SqliteConnectOptions, SqlitePool};
 
 use reqwest;
 use rss;
+
+use url::Url;
 
 #[tokio::main]
 async fn main() {
@@ -89,7 +83,7 @@ struct RootTemplate {}
 
 async fn root() -> Html<String> {
     info!("Entering root handler");
-    let result = RootTemplate { }.render().unwrap();
+    let result = RootTemplate {}.render().unwrap();
     return Html(result);
 }
 
@@ -114,10 +108,39 @@ async fn get_feeds_from_db() -> Vec<Feed> {
     return feeds;
 }
 
+async fn is_valid_rss_feed(url: &str) -> Result<bool, Box<dyn std::error::Error>> {
+    let parsed_url = match Url::parse(url) {
+        Ok(url) => url,
+        Err(_) => return Ok(false),
+    };
+
+    if parsed_url.scheme() != "http" && parsed_url.scheme() != "https" {
+        return Ok(false);
+    }
+
+    let response = reqwest::get(url).await?;
+
+    if let Some(content_type) = response.headers().get(reqwest::header::CONTENT_TYPE) {
+        let content_type = content_type.to_str()?.to_lowercase();
+        if content_type.contains("application/rss+xml")
+            || content_type.contains("application/xml")
+            || content_type.contains("text/xml")
+        {
+            return Ok(true);
+        }
+    }
+
+    return Ok(false);
+}
+
 async fn post_feed(feed: Form<FeedParams>) -> (StatusCode, String) {
     info!("Entering feed handler");
 
     info!("URL: {}", feed.url);
+
+    if !is_valid_rss_feed(&feed.url).await.unwrap() {
+        return (StatusCode::BAD_REQUEST, "Invalid RSS feed".to_string());
+    }
 
     let pool = connect_db().await;
 
@@ -190,25 +213,23 @@ async fn fetch_rss_entries() -> Vec<EntryList> {
     for feed in feeds {
         let mut entries = Vec::<Entry>::new();
         match fetch_rss_feed(&feed.url).await {
-            Ok(xml) => {
-                match parse_rss_feed(&xml) {
-                    Ok(channel) => {
-                        for item in channel.items() {
-                            if let Some(title) = item.title() {
-                                entries.push(Entry {
-                                    title: title.to_string(),
-                                    url: item.link().unwrap_or("").to_string(),
-                                    description: item.description().unwrap_or("").to_string(),
-                                    comments: item.comments().unwrap_or("").to_string(),
-                                });
-                            }
+            Ok(xml) => match parse_rss_feed(&xml) {
+                Ok(channel) => {
+                    for item in channel.items() {
+                        if let Some(title) = item.title() {
+                            entries.push(Entry {
+                                title: title.to_string(),
+                                url: item.link().unwrap_or("").to_string(),
+                                description: item.description().unwrap_or("").to_string(),
+                                comments: item.comments().unwrap_or("").to_string(),
+                            });
                         }
                     }
-                    Err(e) => {
-                        info!("Error parsing feed: {}", e);
-                    }
                 }
-            }
+                Err(e) => {
+                    info!("Error parsing feed: {}", e);
+                }
+            },
             Err(e) => {
                 info!("Error fetching feed: {}", e);
             }
