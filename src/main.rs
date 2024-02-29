@@ -2,7 +2,9 @@ use axum::{
     routing::{
         get,
         post,
+        delete,
     },
+    extract::Path,
     http::StatusCode,
     response::Html,
     Router,
@@ -38,6 +40,7 @@ async fn main() {
         .route("/", get(root))
         .route("/feeds", get(get_feeds))
         .route("/feeds", post(post_feed))
+        .route("/feeds/:id", delete(delete_feed))
         .route("/headlines", get(get_headlines));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
@@ -129,6 +132,22 @@ async fn post_feed(feed: Form<FeedParams>) -> (StatusCode, String) {
     return (StatusCode::OK, result);
 }
 
+async fn delete_feed(Path(id): Path<i64>) -> (StatusCode, String) {
+    info!("Entering delete feed handler");
+
+    let pool = connect_db().await;
+
+    let _ = sqlx::query("DELETE FROM feeds WHERE id = ?")
+        .bind(id)
+        .execute(&pool)
+        .await;
+
+    let feeds = get_feeds_from_db().await;
+
+    let result = FeedTemplate { feeds: &feeds }.render().unwrap();
+    return (StatusCode::OK, result);
+}
+
 async fn get_feeds() -> Html<String> {
     let feeds = get_feeds_from_db().await;
     let result = FeedTemplate { feeds: &feeds }.render().unwrap();
@@ -146,19 +165,42 @@ fn parse_rss_feed(xml: &str) -> Result<rss::Channel, rss::Error> {
     return Ok(channel);
 }
 
-async fn get_headlines() -> Html<String> {
+struct Entry {
+    title: String,
+    url: String,
+    description: String,
+    comments: String,
+}
+
+struct EntryList {
+    feed_url: String,
+    entries: Vec<Entry>,
+}
+
+#[derive(Template)]
+#[template(path = "entry.html")]
+struct EntryTemplate<'a> {
+    entry: &'a Entry,
+}
+
+async fn fetch_rss_entries() -> Vec<EntryList> {
     let feeds = get_feeds_from_db().await;
-    let mut result = String::new();
+    let mut result = Vec::<EntryList>::new();
 
     for feed in feeds {
-        let mut headlines = String::new();
+        let mut entries = Vec::<Entry>::new();
         match fetch_rss_feed(&feed.url).await {
             Ok(xml) => {
                 match parse_rss_feed(&xml) {
                     Ok(channel) => {
                         for item in channel.items() {
                             if let Some(title) = item.title() {
-                                headlines.push_str(&format!("<li>{}</li>", title));
+                                entries.push(Entry {
+                                    title: title.to_string(),
+                                    url: item.link().unwrap_or("").to_string(),
+                                    description: item.description().unwrap_or("").to_string(),
+                                    comments: item.comments().unwrap_or("").to_string(),
+                                });
                             }
                         }
                     }
@@ -171,9 +213,28 @@ async fn get_headlines() -> Html<String> {
                 info!("Error fetching feed: {}", e);
             }
         }
-        result.push_str(&format!("<h2>{}</h2>", feed.url));
-        result.push_str(&format!("<ul>{}</ul>", headlines));
+        result.push(EntryList {
+            feed_url: feed.url,
+            entries,
+        });
     }
 
+    return result;
+}
+
+fn render_feed_html(feeds: Vec<EntryList>) -> String {
+    let mut result = String::new();
+    for feed in feeds {
+        for entry in feed.entries {
+            let entry_html = EntryTemplate { entry: &entry }.render().unwrap();
+            result.push_str(&entry_html);
+        }
+    }
+    return result;
+}
+
+async fn get_headlines() -> Html<String> {
+    let feeds = fetch_rss_entries().await;
+    let result = render_feed_html(feeds);
     return Html(result);
 }

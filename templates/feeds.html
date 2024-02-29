@@ -1,5 +1,8 @@
 <ul>
   {% for feed in feeds %}
-    <li>{{ feed.url }}</li>
+    <li>
+      <span>{{ feed.url }}</span>
+      <button hx-delete="/feeds/{{ feed.id }}" hx-target="#feed-response">Delete</button>
+    </li>
   {% endfor %}
 </ul>
