@@ -1,20 +1,14 @@
-use axum::{
-    extract::Path,
-    http::StatusCode,
-    response::Html,
-    Form,
-};
+use axum::{extract::Path, http::StatusCode, response::Html, Form};
 
-use askama::Template;
 use crate::db::{connect_db, Feed};
-use serde::Deserialize;
-use url::Url;
+use askama::Template;
 use reqwest;
 use rss;
+use serde::Deserialize;
 use tracing::info;
+use url::Url;
 
 use std::vec::Vec;
-
 
 // Initial template
 #[derive(Template)]

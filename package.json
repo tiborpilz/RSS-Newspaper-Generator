@@ -1,0 +1,10 @@
+{
+  "name": "rss-newspaper-generator",
+  "version": "1.0.0",
+  "license": "NONE",
+  "devDependencies": {
+    "prettier": "^3.2.5",
+    "prettier-plugin-tailwindcss": "^0.5.11",
+    "tailwindcss": "^3.4.1"
+  }
+}

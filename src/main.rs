@@ -3,6 +3,8 @@ use axum::{
     Router,
 };
 
+use tower_http::services::ServeDir;
+
 use std::net::SocketAddr;
 
 use tracing::info;
@@ -27,7 +29,8 @@ async fn main() {
         .route("/feeds", get(get_feeds))
         .route("/feeds", post(post_feed))
         .route("/feeds/:id", delete(delete_feed))
-        .route("/headlines", get(get_headlines));
+        .route("/headlines", get(get_headlines))
+        .nest_service("/assets", ServeDir::new("assets"));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
 
@@ -38,4 +41,3 @@ async fn main() {
         .await
         .unwrap();
 }
-
