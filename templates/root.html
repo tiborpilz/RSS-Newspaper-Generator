@@ -10,10 +10,26 @@
         <dt><label for="url">RSS Feed URL</label></dt>
         <dd><input type="text" name="url" id="url" value=""></dd>
       </dl>
-      <button type="submit" hx-post="/feeds" hx-target="#feed-response">Submit</button>
-      <div id="feed-response" hx-get="/feeds" hx-trigger="load"></div>
+      <button
+        type="submit"
+        hx-post="/feeds"
+        hx-target="#feed-response"
+        hx-indicator=".loading"
+      >
+        <span>Submit</span>
+      </button>
+      <div id="feed-response" hx-get="/feeds" hx-trigger="load">
+        <div>
+          <p>Loading...</p>
+        </div>
+      </div>
       <hr />
-      <div id="headlines" hx-get="/headlines" hx-trigger="load"></div>
-    <script src="https://unpkg.com/htmx.org@1.9.9" integrity="sha384-QFjmbokDn2DjBjq+fM+8LUIVrAgqcNW2s0PjAxHETgRn9l4fvX31ZxDxvwQnyMOX" crossorigin="anonymous"></script>
+      <div id="headlines" hx-get="/headlines" hx-trigger="load">
+        <div>
+          <p>Loading...</p>
+        </div>
+      </div>
+    <script src="https://unpkg.com/htmx.org"></script>
+    <script src="https://unpkg.com/htmx.org/dist/ext/loading-states.js"></script>
   </body>
 </html>

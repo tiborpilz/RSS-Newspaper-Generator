@@ -61,6 +61,11 @@ async fn is_valid_rss_feed(url: &str) -> Result<bool, Box<dyn std::error::Error>
     return Ok(false);
 }
 
+pub fn render_feed_list(feeds: Vec<Feed>) -> String {
+    let result = FeedTemplate { feeds: &feeds }.render().unwrap();
+    return result;
+}
+
 #[derive(Deserialize)]
 pub struct FeedParams {
     url: String,
@@ -84,7 +89,7 @@ pub async fn post_feed(feed: Form<FeedParams>) -> (StatusCode, String) {
 
     let feeds = get_feeds_from_db().await;
 
-    let result = FeedTemplate { feeds: &feeds }.render().unwrap();
+    let result = render_feed_list(feeds);
     return (StatusCode::OK, result);
 }
 
@@ -100,7 +105,7 @@ async fn get_feeds_from_db() -> Vec<Feed> {
 
 pub async fn get_feeds() -> Html<String> {
     let feeds = get_feeds_from_db().await;
-    let result = FeedTemplate { feeds: &feeds }.render().unwrap();
+    let result = render_feed_list(feeds);
     return Html(result);
 }
 

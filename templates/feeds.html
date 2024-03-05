@@ -1,8 +1,12 @@
-<ul>
-  {% for feed in feeds %}
-    <li>
-      <span>{{ feed.url }}</span>
-      <button hx-delete="/feeds/{{ feed.id }}" hx-target="#feed-response">Delete</button>
-    </li>
-  {% endfor %}
-</ul>
+{% if feeds.len() > 0 %}
+  <ul>
+    {% for feed in feeds %}
+      <li>
+        <span>{{ feed.url }}</span>
+        <button hx-delete="/feeds/{{ feed.id }}" hx-target="#feed-response">Delete</button>
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p>No feeds found</p>
+{% endif %}
