@@ -1,11 +1,6 @@
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool};
 
-#[derive(sqlx::FromRow)]
-pub struct Feed {
-    pub id: i64,
-    pub url: String,
-}
-
+#[cfg(feature = "ssr")]
 pub async fn connect_db() -> SqlitePool {
     let db_url = "db.sqlite3";
     let conn_opts = SqliteConnectOptions::new()
