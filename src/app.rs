@@ -90,6 +90,7 @@ fn FeedList(feeds: Vec<Feed>) -> impl IntoView {
 fn HomePage() -> impl IntoView {
     let add_feed = create_server_action::<AddFeed>();
 
+    // Resource that fetches feeds from the server
     let feeds = create_resource(
         move || (add_feed.version().get()),
         |_| async move {
@@ -98,14 +99,19 @@ fn HomePage() -> impl IntoView {
         }
     );
 
+    // Refetch feeds when the component is mounted
+    create_effect(move |_| {
+        feeds.refetch();
+    });
+
+    // Signal that holds the value of the new feed input
     let (new_feed, set_new_feed) = create_signal::<String>("".to_string());
 
-    let on_click = {
-        move |_| {
-            spawn_local(async move {
-                add_feed.dispatch(AddFeed { url: new_feed.get() });
-            });
-        }
+    // On click handler for the add feed button
+    // Dispatches the add feed action and resets the input
+    let on_click = move |_| {
+        add_feed.dispatch(AddFeed { url: new_feed.get() });
+        set_new_feed("".to_string());
     };
 
     view! {
