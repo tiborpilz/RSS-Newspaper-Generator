@@ -39,6 +39,19 @@ pub async fn get_feeds() -> Result<Vec<Feed>, ServerFnError> {
     return Ok(feeds);
 }
 
+#[server]
+pub async fn delete_feed(id: i64) -> Result<(), ServerFnError> {
+    use crate::db::connect_db;
+
+    let pool = connect_db().await;
+    let _ = sqlx::query("DELETE FROM feeds WHERE id = ?")
+        .bind(id)
+        .execute(&pool)
+        .await;
+
+    return Ok(());
+}
+
 #[component]
 pub fn App() -> impl IntoView {
     // Provides context that manages stylesheets, titles, meta tags, etc.
@@ -68,6 +81,22 @@ pub fn App() -> impl IntoView {
 }
 
 #[component]
+fn FeedItem(feed: Feed) -> impl IntoView {
+    let delete_feed = use_context::<Action<DeleteFeed, Result<(), ServerFnError>>>().expect("No delete feed action");
+
+    let on_click = move |_| {
+        delete_feed.dispatch(DeleteFeed { id: feed.id });
+    };
+
+    view! {
+        <li>
+            {feed.url}
+            <button on:click=on_click>Delete</button>
+        </li>
+    }
+}
+
+#[component]
 fn FeedList(feeds: Vec<Feed>) -> impl IntoView {
     view! {
         <ol>
@@ -78,7 +107,7 @@ fn FeedList(feeds: Vec<Feed>) -> impl IntoView {
                     feed.id
                 }
                 children=|feed| view! {
-                    <li>{feed.url}</li>
+                    <FeedItem feed=feed />
                 }
             />
         </ol>
@@ -89,10 +118,16 @@ fn FeedList(feeds: Vec<Feed>) -> impl IntoView {
 #[component]
 fn HomePage() -> impl IntoView {
     let add_feed = create_server_action::<AddFeed>();
+    let delete_feed = create_server_action::<DeleteFeed>();
+
+    provide_context(delete_feed);
 
     // Resource that fetches feeds from the server
     let feeds = create_resource(
-        move || (add_feed.version().get()),
+        move || (
+            add_feed.version().get(),
+            delete_feed.version().get()
+        ),
         |_| async move {
             logging::log!("Fetching feeds");
             get_feeds().await.unwrap_or_default()
