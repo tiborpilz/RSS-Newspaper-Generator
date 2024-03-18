@@ -68,14 +68,17 @@ pub fn App() -> impl IntoView {
 }
 
 #[component]
-fn FeedList(feeds: ReadSignal<Vec<String>>) -> impl IntoView {
+fn FeedList(feeds: Vec<Feed>) -> impl IntoView {
     view! {
         <ol>
             <For
-                each=feeds
-                key=|feed| feed.clone()
+                each=move || feeds.clone()
+                key=|feed| {
+                    logging::log!("Key: {}", feed.url);
+                    feed.id
+                }
                 children=|feed| view! {
-                    <li>{feed}</li>
+                    <li>{feed.url}</li>
                 }
             />
         </ol>
@@ -89,7 +92,10 @@ fn HomePage() -> impl IntoView {
 
     let feeds = create_resource(
         move || (add_feed.version().get()),
-        move |_| get_feeds()
+        |_| async move {
+            logging::log!("Fetching feeds");
+            get_feeds().await.unwrap_or_default()
+        }
     );
 
     let (new_feed, set_new_feed) = create_signal::<String>("".to_string());
@@ -106,41 +112,11 @@ fn HomePage() -> impl IntoView {
         <h1>RSS Newspaper Generator</h1>
         <button on:click=on_click>Add Feed</button>
         <input type="text" on:input=move |ev| set_new_feed(event_target_value(&ev)) />
-        <Suspense fallback=move || view! { <p>Loading...</p> }>
-            {move || {
-                let existing_feeds = {
-                    move || {
-                        feeds.get()
-                            .map(move |feeds| match feeds {
-                                Err(e) => {
-                                    view! { <p>{format!("Error: {}", e)}</p> }.into_view()
-                                }
-                                Ok(feeds) => {
-                                    if feeds.is_empty() {
-                                        view! { <p>No feeds yet</p> }.into_view()
-                                    } else {
-                                        feeds
-                                            .into_iter()
-                                            .map(move |feed| {
-                                                view! {
-                                                    <li>{feed.url}</li>
-                                                }
-                                            })
-                                            .collect_view()
-                                        }
-                                    }
-                                })
-                                .unwrap_or_default()
-                            }
-                    };
-
-                    view! {
-                        <ul>
-                            {existing_feeds}
-                        </ul>
-                    }
-                }
-            }
-        </Suspense>
+        <Show when=feeds.loading()>
+            <p>Loading...</p>
+        </Show>
+        <Show when=move || feeds.get().is_some()>
+            <FeedList feeds=feeds.get().unwrap() />
+        </Show>
     }
 }
