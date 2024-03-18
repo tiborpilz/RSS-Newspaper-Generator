@@ -120,9 +120,11 @@ fn HomePage() -> impl IntoView {
     let add_feed = create_server_action::<AddFeed>();
     let delete_feed = create_server_action::<DeleteFeed>();
 
+    // Provide delete action to children
     provide_context(delete_feed);
 
-    // Resource that fetches feeds from the server
+    // Resource that fetches feeds from the server when either the
+    // add or delete feed actions are dispatched
     let feeds = create_resource(
         move || (
             add_feed.version().get(),
@@ -139,20 +141,21 @@ fn HomePage() -> impl IntoView {
         feeds.refetch();
     });
 
-    // Signal that holds the value of the new feed input
-    let (new_feed, set_new_feed) = create_signal::<String>("".to_string());
+    // Ref for the input element
+    let input_element: NodeRef<html::Input> = create_node_ref();
 
     // On click handler for the add feed button
     // Dispatches the add feed action and resets the input
     let on_click = move |_| {
-        add_feed.dispatch(AddFeed { url: new_feed.get() });
-        set_new_feed("".to_string());
+        let input_element = input_element().expect("<input> element should be mounted");
+        add_feed.dispatch(AddFeed { url: input_element.value() });
+        input_element.set_value("");
     };
 
     view! {
         <h1>RSS Newspaper Generator</h1>
         <button on:click=on_click>Add Feed</button>
-        <input type="text" on:input=move |ev| set_new_feed(event_target_value(&ev)) />
+        <input type="text" node_ref=input_element />
         <Show when=feeds.loading()>
             <p>Loading...</p>
         </Show>
