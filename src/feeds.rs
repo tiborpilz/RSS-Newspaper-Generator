@@ -2,12 +2,20 @@ use serde::{Deserialize, Serialize};
 use leptos::*;
 use leptos_router::*;
 use url::Url;
+use rss::Channel;
+use std::error::Error;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ssr", derive(sqlx::FromRow))]
 pub struct Feed {
     pub id: i64,
     pub url: String,
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct FeedDetails {
+    pub feed: Feed,
+    pub channel: Channel,
 }
 
 fn is_valid_url(url: String) -> bool {
@@ -62,6 +70,27 @@ pub async fn get_feed(id: i64) -> Result<Feed, ServerFnError> {
         .await?;
 
     return Ok(feed);
+}
+
+async fn fetch_and_parse_rss(url: String) -> Result<Channel, Box<dyn Error>> {
+    let content = reqwest::get(url).await?.text().await?;
+    let channel = content.parse::<Channel>()?;
+    return Ok(channel);
+}
+
+#[server]
+async fn get_channel(id: i64) -> Result<Channel, ServerFnError> {
+    let feed = match get_feed(id).await {
+        Ok(feed) => feed,
+        Err(err) => return Err(ServerFnError::new(format!("Error fetching feed: {}", err))),
+    };
+
+    let channel = match fetch_and_parse_rss(feed.url).await {
+        Ok(channel) => channel,
+        Err(err) => return Err(ServerFnError::new(format!("Error fetching RSS feed: {}", err))),
+    };
+
+    return Ok(channel);
 }
 
 #[server]
@@ -209,19 +238,36 @@ pub fn FeedDetailView() -> impl IntoView {
     let params = use_params_map();
     let id = move || params.with(|params| params.get("id").cloned().unwrap_or_default().parse::<i64>().unwrap_or_default());
 
-    let feed = create_resource(
+    logging::log!("ID: {}", id());
+
+    let feed_details = create_resource(
         move || id(),
         |id| async move {
-            get_feed(id).await.unwrap()
+            get_channel(id).await.unwrap()
         }
     );
 
+    // Refetch feeds when the component is mounted
+    create_effect(move |_| {
+        feed_details.refetch();
+    });
+
+
     view! {
-        <Show when=feed.loading()>
+        <Show when=feed_details.loading()>
             <p>Loading...</p>
         </Show>
-        <Show when=move || feed.get().is_some()>
-            <p>{feed.get().unwrap().url}</p>
+        <Show when=move || feed_details.get().is_some()>
+            <h1>{feed_details.get().unwrap().title}</h1>
+            <p>{feed_details.get().unwrap().description}</p>
+            <For
+                each=move || feed_details.get().unwrap().items.clone()
+                key=|item| item.link.clone()
+                children=|item| view! {
+                    <a href=item.link.clone()>{item.title.clone()}</a>
+                    <p>{item.description.clone()}</p>
+                }
+            />
         </Show>
     }
 }
