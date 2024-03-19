@@ -233,12 +233,18 @@ pub fn FeedListView() -> impl IntoView {
     }
 }
 
+#[derive(Clone, Params, PartialEq)]
+pub struct FeedParams {
+    id: i64,
+}
+
 #[component]
 pub fn FeedDetailView() -> impl IntoView {
-    let params = use_params_map();
-    let id = move || params.with(|params| params.get("id").cloned().unwrap_or_default().parse::<i64>().unwrap_or_default());
+    let params = use_params::<FeedParams>();
 
-    logging::log!("ID: {}", id());
+    let id = move || {
+        params.with(|p| p.clone().unwrap().id)
+    };
 
     let feed_details = create_resource(
         move || id(),
