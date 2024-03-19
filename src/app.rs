@@ -1,5 +1,5 @@
 use crate::error_template::{AppError, ErrorTemplate};
-use crate::feeds::FeedsView;
+use crate::feeds::{FeedListView, FeedDetailView};
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
@@ -25,7 +25,8 @@ pub fn App() -> impl IntoView {
         }>
             <main>
                 <Routes>
-                    <Route path="" view=FeedsView/>
+                    <Route path="" view=FeedListView/>
+                    <Route path="/feeds/:id" view=FeedDetailView />
                 </Routes>
             </main>
         </Router>

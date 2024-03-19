@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use leptos::*;
+use leptos_router::*;
 use url::Url;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -50,6 +51,20 @@ async fn is_valid_rss_feed(url: String) -> bool {
 }
 
 #[server]
+pub async fn get_feed(id: i64) -> Result<Feed, ServerFnError> {
+    use crate::db::connect_db;
+
+    let pool = connect_db().await;
+
+    let feed = sqlx::query_as::<_, Feed>("SELECT * FROM feeds WHERE id = ?")
+        .bind(id)
+        .fetch_one(&pool)
+        .await?;
+
+    return Ok(feed);
+}
+
+#[server]
 pub async fn get_feeds() -> Result<Vec<Feed>, ServerFnError> {
     use crate::db::connect_db;
     use sqlx::Row;
@@ -95,7 +110,7 @@ pub async fn delete_feed(id: i64) -> Result<(), ServerFnError> {
 }
 
 #[component]
-fn FeedItem(feed: Feed) -> impl IntoView {
+fn FeedListItem(feed: Feed) -> impl IntoView {
     let delete_feed = use_context::<Action<DeleteFeed, Result<(), ServerFnError>>>().expect("No delete feed action");
 
     let on_click = move |_| {
@@ -104,7 +119,7 @@ fn FeedItem(feed: Feed) -> impl IntoView {
 
     view! {
         <li>
-            {feed.url}
+            <a href=format!("/feeds/{}", feed.id)>{feed.url}</a>
             <button on:click=on_click>Delete</button>
         </li>
     }
@@ -121,7 +136,7 @@ fn FeedList(feeds: Vec<Feed>) -> impl IntoView {
                     feed.id
                 }
                 children=|feed| view! {
-                    <FeedItem feed=feed />
+                    <FeedListItem feed=feed />
                 }
             />
         </ol>
@@ -129,7 +144,7 @@ fn FeedList(feeds: Vec<Feed>) -> impl IntoView {
 }
 
 #[component]
-pub fn FeedsView() -> impl IntoView {
+pub fn FeedListView() -> impl IntoView {
     let add_feed = create_server_action::<AddFeed>();
     let delete_feed = create_server_action::<DeleteFeed>();
 
@@ -185,6 +200,28 @@ pub fn FeedsView() -> impl IntoView {
         </Show>
         <Show when=move || feeds.get().is_some()>
             <FeedList feeds=feeds.get().unwrap() />
+        </Show>
+    }
+}
+
+#[component]
+pub fn FeedDetailView() -> impl IntoView {
+    let params = use_params_map();
+    let id = move || params.with(|params| params.get("id").cloned().unwrap_or_default().parse::<i64>().unwrap_or_default());
+
+    let feed = create_resource(
+        move || id(),
+        |id| async move {
+            get_feed(id).await.unwrap()
+        }
+    );
+
+    view! {
+        <Show when=feed.loading()>
+            <p>Loading...</p>
+        </Show>
+        <Show when=move || feed.get().is_some()>
+            <p>{feed.get().unwrap().url}</p>
         </Show>
     }
 }
