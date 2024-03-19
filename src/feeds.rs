@@ -1,11 +1,52 @@
 use serde::{Deserialize, Serialize};
 use leptos::*;
+use url::Url;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ssr", derive(sqlx::FromRow))]
 pub struct Feed {
     pub id: i64,
     pub url: String,
+}
+
+fn is_valid_url(url: String) -> bool {
+    let parsed_url = match Url::parse(&url) {
+        Ok(url) => url,
+        Err(_) => return false,
+    };
+
+    match parsed_url.scheme() {
+        "http" | "https" => true,
+        _ => false,
+    }
+}
+
+async fn is_valid_rss_feed(url: String) -> bool {
+    if !is_valid_url(url.clone()) {
+        return false;
+    }
+
+    let response = match reqwest::get(url).await {
+        Ok(response) => response,
+        Err(_) => return false,
+    };
+
+    if let Some(content_type) = response.headers().get(reqwest::header::CONTENT_TYPE) {
+        let content_type = match content_type.to_str() {
+            Ok(content_type) => content_type.to_lowercase(),
+            Err(_) => return false,
+        };
+
+        if content_type.contains("application/rss+xml")
+            || content_type.contains("application/xml")
+            || content_type.contains("text/xml")
+        {
+            return true;
+        }
+        return false;
+    }
+
+    return false;
 }
 
 #[server]
@@ -25,6 +66,11 @@ pub async fn get_feeds() -> Result<Vec<Feed>, ServerFnError> {
 #[server]
 pub async fn add_feed(url: String) -> Result<(), ServerFnError> {
     use crate::db::connect_db;
+
+    // TODO: display error message to user
+    if !is_valid_rss_feed(url.clone()).await {
+        return Err(ServerFnError::new("Invalid RSS feed"));
+    }
 
     let pool = connect_db().await;
     let _ = sqlx::query("INSERT INTO feeds (url) VALUES (?)")
@@ -87,6 +133,8 @@ pub fn FeedsView() -> impl IntoView {
     let add_feed = create_server_action::<AddFeed>();
     let delete_feed = create_server_action::<DeleteFeed>();
 
+    let (error_message, set_error_message) = create_signal(String::new());
+
     // Provide delete action to children
     provide_context(delete_feed);
 
@@ -115,14 +163,23 @@ pub fn FeedsView() -> impl IntoView {
     // Dispatches the add feed action and resets the input
     let on_click = move |_| {
         let input_element = input_element().expect("<input> element should be mounted");
-        add_feed.dispatch(AddFeed { url: input_element.value() });
-        input_element.set_value("");
+        let url = input_element.value();
+        if is_valid_url(url.clone()) {
+            set_error_message("".to_string());
+            add_feed.dispatch(AddFeed { url });
+            input_element.set_value("");
+        } else {
+            set_error_message("Invalid URL".to_string());
+        }
     };
 
     view! {
         <h1>RSS Newspaper Generator</h1>
         <button on:click=on_click>Add Feed</button>
         <input type="text" node_ref=input_element />
+        <Show when=move || !error_message.get().is_empty()>
+            <p>{error_message.get()}</p>
+        </Show>
         <Show when=feeds.loading()>
             <p>Loading...</p>
         </Show>
