@@ -1,5 +1,7 @@
 pub mod app;
 pub mod error_template;
+pub mod feeds;
+
 #[cfg(feature = "ssr")]
 pub mod fileserv;
 
