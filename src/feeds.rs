@@ -270,7 +270,12 @@ pub fn FeedDetailView() -> impl IntoView {
                 each=move || feed_details.get().unwrap().items.clone()
                 key=|item| item.link.clone()
                 children=|item| view! {
-                    <a href=item.link.clone()>{item.title.clone()}</a>
+                    <p>
+                        <a href=item.link.clone()>{item.title.clone()}</a>
+                    </p>
+                    <p>
+                        <a href=format!("/article?url={}", item.link.unwrap())>Read</a>
+                    </p>
                     <div inner_html=item.description.clone()></div>
                 }
             />
