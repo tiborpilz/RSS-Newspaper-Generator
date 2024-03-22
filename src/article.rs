@@ -42,14 +42,14 @@ pub fn ArticleView() -> impl IntoView {
     });
 
     view! {
-        <div>
+        <main>
             <h1>Article</h1>
             <Show when=article.loading()>
                 <p>Loading...</p>
             </Show>
             <Show when=move || article.get().is_some()>
-                <div class="content" inner_html=article.get().unwrap()></div>
+                <section class="content" inner_html=article.get().unwrap()></section>
             </Show>
-        </div>
+        </main>
     }
 }
