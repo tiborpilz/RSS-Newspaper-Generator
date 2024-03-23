@@ -37,19 +37,18 @@ pub fn ArticleView() -> impl IntoView {
         }
     );
 
-    create_effect(move |_| {
-        article.refetch();
-    });
-
     view! {
         <main>
             <h1>Article</h1>
-            <Show when=article.loading()>
-                <p>Loading...</p>
-            </Show>
-            <Show when=move || article.get().is_some()>
-                <section class="content" inner_html=article.get().unwrap()></section>
-            </Show>
+            <Suspense fallback=|| { view! { <p>Loading...</p> } }>
+                {move ||
+                    article.get().map(|content| {
+                        view! {
+                            <section inner_html=content></section>
+                        }
+                    })
+                }
+            </Suspense>
         </main>
     }
 }
