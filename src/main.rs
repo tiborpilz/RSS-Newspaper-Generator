@@ -2,11 +2,13 @@
 #[tokio::main]
 async fn main() {
     use axum::Router;
+    use axum::routing::get;
     use leptos::*;
     use leptos_axum::{generate_route_list, LeptosRoutes};
     use rss_newspaper_generator::app::*;
     use rss_newspaper_generator::fileserv::file_and_error_handler;
     use rss_newspaper_generator::db::connect_db;
+    use rss_newspaper_generator::article::get_article_pdf;
 
     let _ = connect_db().await;
 
@@ -24,7 +26,8 @@ async fn main() {
     let app = Router::new()
         .leptos_routes(&leptos_options, routes, App)
         .fallback(file_and_error_handler)
-        .with_state(leptos_options);
+        .with_state(leptos_options)
+        .route("/article/pdf", get(get_article_pdf));
 
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     logging::log!("listening on http://{}", &addr);

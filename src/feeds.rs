@@ -274,7 +274,10 @@ pub fn FeedDetailView() -> impl IntoView {
                         <a href=item.link.clone()>{item.title.clone()}</a>
                     </p>
                     <p>
-                        <a href=format!("/article?url={}", item.link.unwrap())>Read</a>
+                        <a href=format!("/article?url={}", item.link.clone().unwrap())>Read</a>
+                    </p>
+                    <p>
+                        <a download href=format!("/article/pdf?url={}", item.link.unwrap())>Download as PDF</a>
                     </p>
                     <div inner_html=item.description.clone()></div>
                 }

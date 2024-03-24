@@ -27,6 +27,7 @@ url = "2.5.0"
 reqwest = { version = "0.11.27", features = ["blocking"] }
 rss = { version = "2.0.7", features = ["with-serde"] }
 readability = { version = "0.3.0", features = ["reqwest"], optional = true }
+pandoc = { version = "0.8.11", optional = true }
 
 [features]
 hydrate = ["leptos/hydrate", "leptos_meta/hydrate", "leptos_router/hydrate"]
@@ -36,12 +37,13 @@ ssr = [
     "dep:tower",
     "dep:tower-http",
     "dep:leptos_axum",
-    "dep:sqlx",
+    "dep:pandoc",
     "dep:readability",
+    "dep:sqlx",
+    "dep:tracing",
     "leptos/ssr",
     "leptos_meta/ssr",
     "leptos_router/ssr",
-    "dep:tracing",
 ]
 sqlx = ["dep:sqlx"]
 
