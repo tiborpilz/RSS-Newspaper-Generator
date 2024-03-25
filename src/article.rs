@@ -35,9 +35,11 @@ pub struct ArticlePdfQuery {
 #[cfg(feature = "ssr")]
 pub async fn get_article_pdf(query: Query<ArticlePdfQuery>) -> response::Response {
     let url = query.url.clone();
+    use std::path::PathBuf;
+
     use readability::extractor;
     use tokio::task::spawn_blocking;
-    use pandoc::{Pandoc, InputKind, InputFormat, OutputFormat, OutputKind};
+    use pandoc::{Pandoc, InputKind, InputFormat, OutputFormat, OutputKind, PandocOption};
 
     logging::log!("Scraping article: {}", url);
 
@@ -66,6 +68,7 @@ pub async fn get_article_pdf(query: Query<ArticlePdfQuery>) -> response::Respons
     pandoc.set_input(InputKind::Pipe(article_html));
     pandoc.set_output(OutputKind::Pipe);
 
+    pandoc.add_option(PandocOption::PdfEngine(PathBuf::from("xelatex")));
 
     // Execute pandoc
     let result = pandoc.execute();

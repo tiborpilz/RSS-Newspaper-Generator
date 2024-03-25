@@ -160,10 +160,7 @@ fn FeedList(feeds: Vec<Feed>) -> impl IntoView {
         <ol>
             <For
                 each=move || feeds.clone()
-                key=|feed| {
-                    logging::log!("Key: {}", feed.url);
-                    feed.id
-                }
+                key=|feed| feed.id
                 children=|feed| view! {
                     <FeedListItem feed=feed />
                 }
