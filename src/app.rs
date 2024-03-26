@@ -24,7 +24,7 @@ pub fn App() -> impl IntoView {
             }
             .into_view()
         }>
-            <main>
+            <main class="p-10">
                 <Routes>
                     <Route path="" view=FeedListView/>
                     <Route path="/feeds/:id" view=FeedDetailView />

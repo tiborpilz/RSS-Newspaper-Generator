@@ -261,24 +261,31 @@ pub fn FeedDetailView() -> impl IntoView {
             <p>Loading...</p>
         </Show>
         <Show when=move || feed_details.get().is_some()>
-            <h1>{feed_details.get().unwrap().title}</h1>
-            <p>{feed_details.get().unwrap().description}</p>
-            <For
-                each=move || feed_details.get().unwrap().items.clone()
-                key=|item| item.link.clone()
-                children=|item| view! {
-                    <p>
-                        <a href=item.link.clone()>{item.title.clone()}</a>
-                    </p>
-                    <p>
-                        <a href=format!("/article?url={}", item.link.clone().unwrap())>Read</a>
-                    </p>
-                    <p>
-                        <a download href=format!("/article/pdf?url={}", item.link.unwrap())>Download as PDF</a>
-                    </p>
-                    <div inner_html=item.description.clone()></div>
-                }
-            />
+            <main>
+                <h1>{feed_details.get().unwrap().title}</h1>
+                <p>{feed_details.get().unwrap().description}</p>
+                <For
+                    each=move || feed_details.get().unwrap().items.clone()
+                    key=|item| item.link.clone()
+                    children=|item| view! {
+                        <section class="p-4 my-4 border shadow-lg">
+                            <p class="text-lg">
+                                <a href=item.link.clone()>{item.title.clone()}</a>
+                            </p>
+                            <p>
+                                {item.pub_date.clone()}
+                            </p>
+                            <p>
+                                <a href=format!("/article?url={}", item.link.clone().unwrap())>Read</a>
+                            </p>
+                            <p>
+                                <a download href=format!("/article/pdf?url={}", item.link.unwrap())>Download as PDF</a>
+                            </p>
+                            <div inner_html=item.description.clone()></div>
+                        </section>
+                    }
+                />
+            </main>
         </Show>
     }
 }
