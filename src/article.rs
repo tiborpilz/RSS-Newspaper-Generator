@@ -20,7 +20,7 @@ pub async fn scrape_article(url: String) -> Result<String, ServerFnError> {
         return extractor::scrape(&url)
     }).await {
         Ok(article) => match article {
-            Ok(article) => Ok(article.content),
+            Ok(article) => Ok(format!("<h1>{}</h1>{}", article.title, article.content)),
             Err(err) => Err(ServerFnError::new(format!("Error scraping article: {}", err))),
         },
         Err(err) => Err(ServerFnError::new(format!("Error scraping article: {}", err))),
@@ -52,12 +52,15 @@ pub async fn get_article_pdf(query: Query<ArticlePdfQuery>) -> response::Respons
             .unwrap()
     };
 
-    let article_html = match spawn_blocking(move || {
+    let (article_html, article_title) = match spawn_blocking(move || {
         extractor::scrape(&url)
     }).await.unwrap() {
-        Ok(article) => article.content,
+        Ok(article) => (article.content, article.title),
         Err(e) => return err_response(format!("Error scraping article: {}", e)),
     };
+
+    // Add title to HTML as h1 tag
+    let article_html = format!("<h1>{}</h1>{}", article_title, article_html);
 
     let mut pandoc = Pandoc::new();
 
@@ -115,7 +118,7 @@ pub fn ArticleView() -> impl IntoView {
             <p><a download href=format!("/article/pdf?url={}", url())>Download as PDF</a></p>
             <Suspense fallback=|| { view! { <p>Loading...</p> } }>
                 {move || article.get().map(|content| { view! {
-                    <section class="my-4 p-8 border shadow-lg max-w-[80ch]" inner_html=content></section>
+                    <section class="prose my-4 p-8 border shadow-lg max-w-[80ch]" inner_html=content></section>
                 }})}
             </Suspense>
         </main>
