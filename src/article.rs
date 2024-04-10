@@ -11,6 +11,11 @@ use axum::{
     extract::Query,
 };
 
+#[cfg(feature = "ssr")]
+fn format_article(article: readability::Article) -> String {
+    format!("<h1>{}</h1><p class=\"italic\">{}</p>{}", article.title, article.description, article.content)
+}
+
 #[server]
 pub async fn scrape_article(url: String) -> Result<String, ServerFnError> {
     use readability::extractor;
@@ -20,7 +25,7 @@ pub async fn scrape_article(url: String) -> Result<String, ServerFnError> {
         return extractor::scrape(&url)
     }).await {
         Ok(article) => match article {
-            Ok(article) => Ok(format!("<h1>{}</h1>{}", article.title, article.content)),
+            Ok(article) => Ok(format_article(article)),
             Err(err) => Err(ServerFnError::new(format!("Error scraping article: {}", err))),
         },
         Err(err) => Err(ServerFnError::new(format!("Error scraping article: {}", err))),
@@ -52,15 +57,15 @@ pub async fn get_article_pdf(query: Query<ArticlePdfQuery>) -> response::Respons
             .unwrap()
     };
 
-    let (article_html, article_title) = match spawn_blocking(move || {
+    let article = match spawn_blocking(move || {
         extractor::scrape(&url)
     }).await.unwrap() {
-        Ok(article) => (article.content, article.title),
+        Ok(article) => article,
         Err(e) => return err_response(format!("Error scraping article: {}", e)),
     };
 
     // Add title to HTML as h1 tag
-    let article_html = format!("<h1>{}</h1>{}", article_title, article_html);
+    let article_html = format_article(article);
 
     let mut pandoc = Pandoc::new();
 
