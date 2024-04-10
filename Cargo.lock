@@ -2331,7 +2331,7 @@ dependencies = [
 [[package]]
 name = "readability"
 version = "0.3.0"
-source = "git+https://github.com/tiborpilz/readability.git#c695ca78ba0d7ae15d058f92eb3adc9bd44e0d07"
+source = "git+https://github.com/tiborpilz/readability.git#07db979f9d30b85ec579f2f26a56972a6a7fc326"
 dependencies = [
  "html5ever",
  "lazy_static",

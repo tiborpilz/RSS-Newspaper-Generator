@@ -12,7 +12,7 @@ use axum::{
 };
 
 #[cfg(feature = "ssr")]
-fn format_article(article: readability::Article) -> String {
+fn format_article(article: readability::extractor::Product) -> String {
     format!("<h1>{}</h1><p class=\"italic\">{}</p>{}", article.title, article.description, article.content)
 }
 
