@@ -1,5 +1,4 @@
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool};
-use sqlx::migrate::Migrator;
 
 #[cfg(feature = "ssr")]
 pub async fn connect_db() -> SqlitePool {

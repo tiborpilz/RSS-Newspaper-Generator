@@ -1,3 +1,4 @@
+use crate::app::{HeadlineSetter, HeadlineGetter};
 use serde::{Deserialize, Serialize};
 use leptos::*;
 use leptos_router::*;
@@ -179,6 +180,11 @@ pub fn FeedListView() -> impl IntoView {
     // Provide delete action to children
     provide_context(delete_feed);
 
+    // Use Headline context
+    let set_headline = use_context::<HeadlineSetter>().unwrap().0;
+    set_headline("Feeds".to_string());
+    let headline = use_context::<HeadlineGetter>().unwrap().0;
+
     // Resource that fetches feeds from the server when either the
     // add or delete feed actions are dispatched
     let feeds = create_resource(
@@ -215,7 +221,7 @@ pub fn FeedListView() -> impl IntoView {
     };
 
     view! {
-        <h1>RSS Newspaper Generator</h1>
+        <h1>RSS Newspaper Generator - {headline.get()}</h1>
         <button on:click=on_click>Add Feed</button>
         <input type="text" node_ref=input_element />
         <Show when=move || !error_message.get().is_empty()>
@@ -243,11 +249,27 @@ pub fn FeedDetailView() -> impl IntoView {
         params.with(|p| p.clone().unwrap().id)
     };
 
+
     let feed_details = create_resource(
         move || id(),
         |id| async move {
             get_channel(id).await.unwrap()
         }
+    );
+
+    let set_headline = use_context::<HeadlineSetter>().unwrap().0;
+    let headline = use_context::<HeadlineGetter>().unwrap().0;
+    // set_headline("Feed Details".to_string());
+
+    watch(
+        move || feed_details.get(),
+        move |channel, _, _| {
+            if let Some(channel) = channel {
+                // Use Headline context
+                set_headline(channel.title.clone());
+            }
+        },
+        true
     );
 
     // Refetch feeds when the component is mounted
@@ -262,7 +284,7 @@ pub fn FeedDetailView() -> impl IntoView {
         </Show>
         <Show when=move || feed_details.get().is_some()>
             <main>
-                <h1>{feed_details.get().unwrap().title}</h1>
+                <h1>{headline.get()}</h1>
                 <p>{feed_details.get().unwrap().description}</p>
                 <For
                     each=move || feed_details.get().unwrap().items.clone()
