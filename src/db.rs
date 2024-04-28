@@ -1,4 +1,5 @@
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool};
+use sqlx::migrate::Migrator;
 
 #[cfg(feature = "ssr")]
 pub async fn connect_db() -> SqlitePool {
@@ -9,16 +10,7 @@ pub async fn connect_db() -> SqlitePool {
 
     let pool = SqlitePool::connect_with(conn_opts).await.unwrap();
 
-    // Create the table if doesnt exist
-    let _ = sqlx::query(
-        r#"
-        CREATE TABLE IF NOT EXISTS feeds (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            url TEXT NOT NULL
-        )
-        "#,
-    )
-    .execute(&pool)
-    .await;
+    // Run migrations
+    sqlx::migrate!("./migrations").run(&pool).await.unwrap();
     return pool;
 }
