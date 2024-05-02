@@ -11,6 +11,8 @@ use std::error::Error;
 pub struct Feed {
     pub id: i64,
     pub url: String,
+    pub title: String,
+    pub description: String,
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
@@ -181,9 +183,9 @@ fn FeedListItem(feed: Feed) -> impl IntoView {
     };
 
     view! {
-        <li>
-            <a href=format!("/feeds/{}", feed.id)>{feed.url}</a>
-            <button on:click=on_click>Delete</button>
+        <li class="flex items-center my-2">
+            <a class="flex-1" href=format!("/feeds/{}", feed.id)>{feed.title}</a>
+            <button class="p-2 ml-2 rounded bg-slate-100" on:click=on_click>Delete</button>
         </li>
     }
 }
@@ -191,7 +193,7 @@ fn FeedListItem(feed: Feed) -> impl IntoView {
 #[component]
 fn FeedList(feeds: Vec<Feed>) -> impl IntoView {
     view! {
-        <ol>
+        <ul>
             <For
                 each=move || feeds.clone()
                 key=|feed| feed.id
@@ -199,7 +201,7 @@ fn FeedList(feeds: Vec<Feed>) -> impl IntoView {
                     <FeedListItem feed=feed />
                 }
             />
-        </ol>
+        </ul>
     }
 }
 
@@ -254,18 +256,21 @@ pub fn FeedListView() -> impl IntoView {
     };
 
     view! {
-        <h1>RSS Newspaper Generator - {headline.get()}</h1>
-        <button on:click=on_click>Add Feed</button>
-        <input type="text" node_ref=input_element />
-        <Show when=move || !error_message.get().is_empty()>
-            <p>{error_message.get()}</p>
-        </Show>
-        <Show when=feeds.loading()>
-            <p>Loading...</p>
-        </Show>
-        <Show when=move || feeds.get().is_some()>
-            <FeedList feeds=feeds.get().unwrap() />
-        </Show>
+        <div class="max-w-[700px]">
+            <div class="flex gap-2">
+                <input class="p-2 rounded border flex-1" type="text" node_ref=input_element placeholder="https://example.com" />
+                <button class="p-2 rounded bg-slate-100" on:click=on_click>Add Feed</button>
+            </div>
+            <Show when=move || !error_message.get().is_empty()>
+                <p>{error_message.get()}</p>
+            </Show>
+            <Show when=feeds.loading()>
+                <p>Loading...</p>
+            </Show>
+            <Show when=move || feeds.get().is_some()>
+                <FeedList feeds=feeds.get().unwrap() />
+            </Show>
+        </div>
     }
 }
 
@@ -323,7 +328,6 @@ pub fn FeedDetailView() -> impl IntoView {
         </Show>
         <Show when=move || channel.get().is_some()>
             <main>
-                <h1>{headline.get()}</h1>
                 <p>{channel.get().unwrap().description}</p>
                 <For
                     each=move || channel.get().unwrap().items.clone()
