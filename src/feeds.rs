@@ -117,9 +117,42 @@ pub async fn add_feed(url: String) -> Result<(), ServerFnError> {
         return Err(ServerFnError::new("Invalid RSS feed"));
     }
 
+    let channel = match fetch_and_parse_rss(url.clone()).await {
+        Ok(channel) => channel,
+        Err(err) => return Err(ServerFnError::new(format!("Error fetching RSS feed: {}", err))),
+    };
+
     let pool = connect_db().await;
-    let _ = sqlx::query("INSERT INTO feeds (url) VALUES (?)")
+    let _ = sqlx::query("INSERT INTO feeds (url, title, description) VALUES (?, ?, ?)")
         .bind(url)
+        .bind(channel.title)
+        .bind(channel.description)
+        .execute(&pool)
+        .await;
+
+    return Ok(());
+}
+
+#[server]
+pub async fn update_feed_info(id: i64) -> Result<(), ServerFnError> {
+    use crate::db::connect_db;
+
+    let pool = connect_db().await;
+
+    let feed = sqlx::query_as::<_, Feed>("SELECT * FROM feeds where id = ?")
+        .bind(id)
+        .fetch_one(&pool)
+        .await?;
+
+    let channel = match fetch_and_parse_rss(feed.url).await {
+        Ok(channel) => channel,
+        Err(err) => return Err(ServerFnError::new(format!("Error fetching RSS feed: {}", err))),
+    };
+
+    let _ = sqlx::query("UPDATE feeds SET title = ?, description = ? WHERE id = ?")
+        .bind(channel.title)
+        .bind(channel.description)
+        .bind(id)
         .execute(&pool)
         .await;
 
@@ -250,19 +283,25 @@ pub fn FeedDetailView() -> impl IntoView {
     };
 
 
-    let feed_details = create_resource(
+    let channel = create_resource(
         move || id(),
         |id| async move {
             get_channel(id).await.unwrap()
         }
     );
 
+    params.with(|p| {
+        update_feed_info(p.clone().unwrap().id);
+    });
+
+    // update feed as soon as id is available
+
     let set_headline = use_context::<HeadlineSetter>().unwrap().0;
     let headline = use_context::<HeadlineGetter>().unwrap().0;
     // set_headline("Feed Details".to_string());
 
     watch(
-        move || feed_details.get(),
+        move || channel.get(),
         move |channel, _, _| {
             if let Some(channel) = channel {
                 // Use Headline context
@@ -274,20 +313,20 @@ pub fn FeedDetailView() -> impl IntoView {
 
     // Refetch feeds when the component is mounted
     create_effect(move |_| {
-        feed_details.refetch();
+        channel.refetch();
     });
 
 
     view! {
-        <Show when=feed_details.loading()>
+        <Show when=channel.loading()>
             <p>Loading...</p>
         </Show>
-        <Show when=move || feed_details.get().is_some()>
+        <Show when=move || channel.get().is_some()>
             <main>
                 <h1>{headline.get()}</h1>
-                <p>{feed_details.get().unwrap().description}</p>
+                <p>{channel.get().unwrap().description}</p>
                 <For
-                    each=move || feed_details.get().unwrap().items.clone()
+                    each=move || channel.get().unwrap().items.clone()
                     key=|item| item.link.clone()
                     children=|item| view! {
                         <section class="p-4 my-4 border shadow-lg">
