@@ -1,4 +1,5 @@
 use crate::app::{HeadlineSetter, HeadlineGetter};
+use crate::layout::Layout;
 use serde::{Deserialize, Serialize};
 use leptos::*;
 use leptos_router::*;
@@ -215,11 +216,6 @@ pub fn FeedListView() -> impl IntoView {
     // Provide delete action to children
     provide_context(delete_feed);
 
-    // Use Headline context
-    let set_headline = use_context::<HeadlineSetter>().unwrap().0;
-    set_headline("Feeds".to_string());
-    let headline = use_context::<HeadlineGetter>().unwrap().0;
-
     // Resource that fetches feeds from the server when either the
     // add or delete feed actions are dispatched
     let feeds = create_resource(
@@ -250,20 +246,22 @@ pub fn FeedListView() -> impl IntoView {
     };
 
     view! {
-        <div class="max-w-[700px]">
-            <div class="flex gap-2">
-                <input class="p-2 rounded border flex-1" type="text" node_ref=input_element placeholder="https://example.com" />
-                <button class="p-2 rounded bg-slate-100" on:click=on_click>Add Feed</button>
+        <Layout headline="Feeds".to_string() >
+            <div class="max-w-[700px]">
+                <div class="flex gap-2">
+                    <input class="p-2 rounded border flex-1" type="text" node_ref=input_element placeholder="https://example.com" />
+                    <button class="p-2 rounded bg-slate-100" on:click=on_click>Add Feed</button>
+                </div>
+                <Show when=move || !error_message.get().is_empty()>
+                    <p>{error_message.get()}</p>
+                </Show>
+                <Suspense fallback=|| view! { <p>Loading...</p> }>
+                    {move || feeds.get().map(|feeds| view! {
+                        <FeedList feeds />
+                    })}
+                </Suspense>
             </div>
-            <Show when=move || !error_message.get().is_empty()>
-                <p>{error_message.get()}</p>
-            </Show>
-            <Suspense fallback=|| view! { <p>Loading...</p> }>
-                {move || feeds.get().map(|feeds| view! {
-                    <FeedList feeds />
-                })}
-            </Suspense>
-        </div>
+        </Layout>
     }
 }
 
@@ -287,42 +285,37 @@ pub fn FeedDetailView() -> impl IntoView {
         update_feed_info(p.clone().unwrap().id);
     });
 
-    watch(
-        move || channel.get(),
-        move |channel, _, _| {
-            if let Some(channel) = channel {
-                let set_headline = use_context::<HeadlineSetter>().unwrap().0;
-                set_headline(channel.title.clone());
-            }
-        },
-        true
-    );
-
     view! {
-        <Suspense fallback=|| view! { <p>Loading...</p> }>
+        <Suspense fallback=|| view! {
+            <Layout headline="Feed Details".to_string()>
+                <p>Loading...</p>
+            </Layout>
+        }>
             {move || channel.get().map(|c| view! {
-                <p>{c.description}</p>
-                <For
-                    each=move || c.items.clone()
-                    key=|item| item.link.clone()
-                    children=|item| view! {
-                        <section class="p-4 my-4 border shadow-lg">
-                            <p class="text-lg">
-                                <a href=item.link.clone()>{item.title.clone()}</a>
-                            </p>
-                            <p>
-                                {item.pub_date.clone()}
-                            </p>
-                            <p>
-                                <a href=format!("/article?url={}", item.link.clone().unwrap())>Read</a>
-                            </p>
-                            <p>
-                                <a download href=format!("/article/pdf?url={}", item.link.unwrap())>Download as PDF</a>
-                            </p>
-                            <div inner_html=item.description.clone()></div>
-                        </section>
-                    }
-                />
+                <Layout headline=c.title>
+                    <p>{c.description}</p>
+                    <For
+                        each=move || c.items.clone()
+                        key=|item| item.link.clone()
+                        children=|item| view! {
+                            <section class="p-4 my-4 border shadow-lg">
+                                <p class="text-lg">
+                                    <a href=item.link.clone()>{item.title.clone()}</a>
+                                </p>
+                                <p>
+                                    {item.pub_date.clone()}
+                                </p>
+                                <p>
+                                    <a href=format!("/article?url={}", item.link.clone().unwrap())>Read</a>
+                                </p>
+                                <p>
+                                    <a download href=format!("/article/pdf?url={}", item.link.unwrap())>Download as PDF</a>
+                                </p>
+                                <div inner_html=item.description.clone()></div>
+                            </section>
+                        }
+                    />
+                </Layout>
 
             })}
         </Suspense>
