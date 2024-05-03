@@ -41,8 +41,8 @@ pub fn App() -> impl IntoView {
         }>
             <main class="mt-32 p-10">
                 <Routes>
-                    <Route path="" view=FeedListView/>
-                    <Route path="/feeds/:id" view=FeedDetailView />
+                    <Route path="" view=FeedListView ssr=SsrMode::Async />
+                    <Route path="/feeds/:id" view=FeedDetailView ssr=SsrMode::Async />
                     <Route path="/article" view=ArticleView ssr=SsrMode::Async />
                 </Routes>
             </main>

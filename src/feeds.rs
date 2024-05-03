@@ -228,15 +228,9 @@ pub fn FeedListView() -> impl IntoView {
             delete_feed.version().get()
         ),
         |_| async move {
-            logging::log!("Fetching feeds");
             get_feeds().await.unwrap_or_default()
         }
     );
-
-    // Refetch feeds when the component is mounted
-    create_effect(move |_| {
-        feeds.refetch();
-    });
 
     // Ref for the input element
     let input_element: NodeRef<html::Input> = create_node_ref();
@@ -264,12 +258,11 @@ pub fn FeedListView() -> impl IntoView {
             <Show when=move || !error_message.get().is_empty()>
                 <p>{error_message.get()}</p>
             </Show>
-            <Show when=feeds.loading()>
-                <p>Loading...</p>
-            </Show>
-            <Show when=move || feeds.get().is_some()>
-                <FeedList feeds=feeds.get().unwrap() />
-            </Show>
+            <Suspense fallback=|| view! { <p>Loading...</p> }>
+                {move || feeds.get().map(|feeds| view! {
+                    <FeedList feeds />
+                })}
+            </Suspense>
         </div>
     }
 }
@@ -283,13 +276,8 @@ pub struct FeedParams {
 pub fn FeedDetailView() -> impl IntoView {
     let params = use_params::<FeedParams>();
 
-    let id = move || {
-        params.with(|p| p.clone().unwrap().id)
-    };
-
-
     let channel = create_resource(
-        move || id(),
+        move || params.get().unwrap().id,
         |id| async move {
             get_channel(id).await.unwrap()
         }
@@ -299,38 +287,23 @@ pub fn FeedDetailView() -> impl IntoView {
         update_feed_info(p.clone().unwrap().id);
     });
 
-    // update feed as soon as id is available
-
-    let set_headline = use_context::<HeadlineSetter>().unwrap().0;
-    let headline = use_context::<HeadlineGetter>().unwrap().0;
-    // set_headline("Feed Details".to_string());
-
     watch(
         move || channel.get(),
         move |channel, _, _| {
             if let Some(channel) = channel {
-                // Use Headline context
+                let set_headline = use_context::<HeadlineSetter>().unwrap().0;
                 set_headline(channel.title.clone());
             }
         },
         true
     );
 
-    // Refetch feeds when the component is mounted
-    create_effect(move |_| {
-        channel.refetch();
-    });
-
-
     view! {
-        <Show when=channel.loading()>
-            <p>Loading...</p>
-        </Show>
-        <Show when=move || channel.get().is_some()>
-            <main>
-                <p>{channel.get().unwrap().description}</p>
+        <Suspense fallback=|| view! { <p>Loading...</p> }>
+            {move || channel.get().map(|c| view! {
+                <p>{c.description}</p>
                 <For
-                    each=move || channel.get().unwrap().items.clone()
+                    each=move || c.items.clone()
                     key=|item| item.link.clone()
                     children=|item| view! {
                         <section class="p-4 my-4 border shadow-lg">
@@ -350,7 +323,8 @@ pub fn FeedDetailView() -> impl IntoView {
                         </section>
                     }
                 />
-            </main>
-        </Show>
+
+            })}
+        </Suspense>
     }
 }
