@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use leptos::*;
 use leptos_router::*;
 use url::Url;
-use rss::Channel;
+use rss::{Channel, Item};
 use std::error::Error;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -270,6 +270,27 @@ pub struct FeedParams {
 }
 
 #[component]
+fn FeedDetailItem(item: Item) -> impl IntoView {
+    return view!{
+        <section class="p-4 my-4 border shadow-lg">
+            <p class="text-lg">
+                <a href=item.link.clone()>{item.title.clone()}</a>
+            </p>
+            <p>
+                {item.pub_date.clone()}
+            </p>
+            <p>
+                <a href=format!("/article?url={}", item.link.clone().unwrap())>Read</a>
+            </p>
+            <p>
+                <a download href=format!("/article/pdf?url={}", item.link.unwrap())>Download as PDF</a>
+            </p>
+            <div inner_html=item.description.clone()></div>
+        </section>
+    };
+}
+
+#[component]
 pub fn FeedDetailView() -> impl IntoView {
     let params = use_params::<FeedParams>();
 
@@ -300,27 +321,27 @@ pub fn FeedDetailView() -> impl IntoView {
             {move || feed.get().map(|feed| view! {
                 <Layout headline=feed.title>
                     <p>{feed.description}</p>
-                    <Suspense fallback=|| view! { <p>Loading...</p> }>
+                    <Suspense fallback=|| view! {
+                        <For
+                            each=move || (1..5)
+                            key=|i| i.clone()
+                            children=|_| view! {
+                                <section class="p-4 my-4 border shadow-lg flex flex-col gap-1">
+                                    <p class="w-[80ch] h-6 rounded bg-slate-100 animate-pulse" />
+                                    <p class="w-[32ch] h-5 rounded bg-slate-100 animate-pulse" />
+                                    <p class="w-[5ch] h-5 rounded bg-slate-100 animate-pulse" />
+                                    <p class="w-[16ch] h-5 rounded bg-slate-100 animate-pulse" />
+                                    <p class="w-[50ch] h-5 rounded bg-slate-100 animate-pulse" />
+                                </section>
+                            }
+                        />
+                    }>
                         {move || channel.get().map(|channel| view! {
                             <For
                                 each=move || channel.items.clone()
                                 key=|item| item.link.clone()
                                 children=|item| view! {
-                                    <section class="p-4 my-4 border shadow-lg">
-                                        <p class="text-lg">
-                                            <a href=item.link.clone()>{item.title.clone()}</a>
-                                        </p>
-                                        <p>
-                                            {item.pub_date.clone()}
-                                        </p>
-                                        <p>
-                                            <a href=format!("/article?url={}", item.link.clone().unwrap())>Read</a>
-                                        </p>
-                                        <p>
-                                            <a download href=format!("/article/pdf?url={}", item.link.unwrap())>Download as PDF</a>
-                                        </p>
-                                        <div inner_html=item.description.clone()></div>
-                                    </section>
+                                    <FeedDetailItem item />
                                 }
                             />
                         })}
