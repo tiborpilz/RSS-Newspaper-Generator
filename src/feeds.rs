@@ -1,4 +1,3 @@
-use crate::app::{HeadlineSetter, HeadlineGetter};
 use crate::layout::Layout;
 use serde::{Deserialize, Serialize};
 use leptos::*;
@@ -274,6 +273,13 @@ pub struct FeedParams {
 pub fn FeedDetailView() -> impl IntoView {
     let params = use_params::<FeedParams>();
 
+    let feed = create_resource(
+        move || params.get().unwrap().id,
+        |id| async move {
+            get_feed(id).await.unwrap()
+        }
+    );
+
     let channel = create_resource(
         move || params.get().unwrap().id,
         |id| async move {
@@ -291,30 +297,34 @@ pub fn FeedDetailView() -> impl IntoView {
                 <p>Loading...</p>
             </Layout>
         }>
-            {move || channel.get().map(|c| view! {
-                <Layout headline=c.title>
-                    <p>{c.description}</p>
-                    <For
-                        each=move || c.items.clone()
-                        key=|item| item.link.clone()
-                        children=|item| view! {
-                            <section class="p-4 my-4 border shadow-lg">
-                                <p class="text-lg">
-                                    <a href=item.link.clone()>{item.title.clone()}</a>
-                                </p>
-                                <p>
-                                    {item.pub_date.clone()}
-                                </p>
-                                <p>
-                                    <a href=format!("/article?url={}", item.link.clone().unwrap())>Read</a>
-                                </p>
-                                <p>
-                                    <a download href=format!("/article/pdf?url={}", item.link.unwrap())>Download as PDF</a>
-                                </p>
-                                <div inner_html=item.description.clone()></div>
-                            </section>
-                        }
-                    />
+            {move || feed.get().map(|feed| view! {
+                <Layout headline=feed.title>
+                    <p>{feed.description}</p>
+                    <Suspense fallback=|| view! { <p>Loading...</p> }>
+                        {move || channel.get().map(|channel| view! {
+                            <For
+                                each=move || channel.items.clone()
+                                key=|item| item.link.clone()
+                                children=|item| view! {
+                                    <section class="p-4 my-4 border shadow-lg">
+                                        <p class="text-lg">
+                                            <a href=item.link.clone()>{item.title.clone()}</a>
+                                        </p>
+                                        <p>
+                                            {item.pub_date.clone()}
+                                        </p>
+                                        <p>
+                                            <a href=format!("/article?url={}", item.link.clone().unwrap())>Read</a>
+                                        </p>
+                                        <p>
+                                            <a download href=format!("/article/pdf?url={}", item.link.unwrap())>Download as PDF</a>
+                                        </p>
+                                        <div inner_html=item.description.clone()></div>
+                                    </section>
+                                }
+                            />
+                        })}
+                    </Suspense>
                 </Layout>
 
             })}

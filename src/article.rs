@@ -33,6 +33,7 @@ pub async fn scrape_article(url: String) -> Result<String, ServerFnError> {
     }
 }
 
+#[cfg(feature = "ssr")]
 #[derive(Deserialize)]
 pub struct ArticlePdfQuery {
     url: String,

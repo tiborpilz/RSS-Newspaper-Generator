@@ -1,4 +1,3 @@
-use crate::app::HeadlineGetter;
 use leptos::*;
 use leptos_meta::*;
 
