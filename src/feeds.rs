@@ -326,12 +326,13 @@ pub fn FeedDetailView() -> impl IntoView {
                             each=move || (1..5)
                             key=|i| i.clone()
                             children=|_| view! {
-                                <section class="p-4 my-4 border shadow-lg flex flex-col gap-1">
-                                    <p class="w-[80ch] h-6 rounded bg-slate-100 animate-pulse" />
-                                    <p class="w-[32ch] h-5 rounded bg-slate-100 animate-pulse" />
-                                    <p class="w-[5ch] h-5 rounded bg-slate-100 animate-pulse" />
-                                    <p class="w-[16ch] h-5 rounded bg-slate-100 animate-pulse" />
-                                    <p class="w-[50ch] h-5 rounded bg-slate-100 animate-pulse" />
+                                <section class="p-4 my-4 border shadow-lg flex flex-col">
+                                    <p class="w-[80ch] my-0.5 h-6 rounded bg-slate-100 animate-pulse" />
+                                    <p class="w-[32ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
+                                    <p class="w-[5ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
+                                    <p class="w-[16ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
+                                    <p class="w-[72ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
+                                    <p class="w-[50ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
                                 </section>
                             }
                         />
