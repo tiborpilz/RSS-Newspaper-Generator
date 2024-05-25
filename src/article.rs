@@ -113,7 +113,7 @@ pub fn ArticleView() -> impl IntoView {
         query.with(|q| q.clone().unwrap().url)
     };
 
-    let feed = create_resource(
+    let feed = create_blocking_resource(
         move || query.get().unwrap().feed_id,
         |id| async move { get_feed(id).await.unwrap() },
     );
@@ -133,17 +133,25 @@ pub fn ArticleView() -> impl IntoView {
                 <p>Loading...</p>
             </Layout>
         }>
-            {move || article.get().map(|content| { view! {
+            {move || feed.get().map(|feed| { view! {
                 <Layout headline="Article".to_string()>
                     <BreadCrumbs items=vec![
                         BreadCrumbItem { text: "Home".to_string(), url: "/".to_string() },
-                        BreadCrumbItem { text: feed.get().unwrap().title.clone(), url: format!("/feeds/{}", feed.get().unwrap().id) },
+                        BreadCrumbItem { text: feed.title.clone(), url: format!("/feeds/{}", feed.id) },
                         BreadCrumbItem { text: "Article".to_string(), url: url() },
                     ] />
                     <p>
                         <a download href=format!("/article/pdf?url={}", url())>Download as PDF</a>
                     </p>
-                    <section class="prose my-4 p-8 border shadow-lg max-w-[80ch]" inner_html=content></section>
+                    <Suspense fallback=|| view! {
+                        <section class="my-4 p-8 border shadow-lg max-w-[80ch]">
+                            <div class="w-[60ch] h-12 rounded bg-slate-100 animate-pulse" />
+                        </section>
+                    }>
+                        {move || article.get().map(|content| { view! {
+                            <section class="prose my-4 p-8 border shadow-lg max-w-[80ch]" inner_html=content></section>
+                        }})}
+                    </Suspense>
                 </Layout>
             }})}
         </Suspense>

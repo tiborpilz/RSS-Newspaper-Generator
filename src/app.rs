@@ -24,7 +24,7 @@ pub fn App() -> impl IntoView {
                 <Route path="" view=FeedListView ssr=SsrMode::Async />
                 <Route path="/feeds" view=FeedListView ssr=SsrMode::Async />
                 <Route path="/feeds/:id" view=FeedDetailView ssr=SsrMode::PartiallyBlocked />
-                <Route path="/article" view=ArticleView ssr=SsrMode::Async />
+                <Route path="/article" view=ArticleView ssr=SsrMode::PartiallyBlocked />
             </Routes>
         </Router>
     }
