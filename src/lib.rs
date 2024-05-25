@@ -4,6 +4,7 @@ pub mod feeds;
 pub mod article;
 pub mod layout;
 pub mod breadcrumbs;
+pub mod date;
 
 #[cfg(feature = "ssr")]
 pub mod fileserv;

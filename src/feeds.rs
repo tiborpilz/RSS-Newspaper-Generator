@@ -1,5 +1,7 @@
 use crate::layout::Layout;
 use crate::breadcrumbs::{BreadCrumbItem, BreadCrumbs};
+use crate::date::FormattedDate;
+
 use leptos::*;
 use leptos_router::*;
 use rss::{Channel, Item};
@@ -286,21 +288,19 @@ fn FeedDetailItem(item: Item, feed_id: i64) -> impl IntoView {
     return view! {
         <section class="p-4 my-4 border shadow-lg">
             <p class="text-lg">
-                <a href=item.link.clone()>{item.title.clone()}</a>
-            </p>
-            <p>
-                {item.pub_date.clone()}
-            </p>
-            <p>
                 <a href=format!(
                     "/article?url={}&feed_id={}",
                     item.link.clone().unwrap(),
                     feed_id
                 )>
-                    Read
+                    {item.title.clone()}
                 </a>
             </p>
-            <p>
+            <p class="text-sm mb-2">
+                <span class="mr-2">
+                    <FormattedDate date_string=item.pub_date.clone().unwrap_or_default() />
+                </span>
+                <a class="mr-2" href=item.link.clone()>Read Original</a>
                 <a download href=format!("/article/pdf?url={}", item.link.unwrap())>Download as PDF</a>
             </p>
             <div inner_html=item.description.clone()></div>
@@ -342,14 +342,16 @@ pub fn FeedDetailView() -> impl IntoView {
                         ] />
                         <Suspense fallback=|| view! {
                             <For
-                                each=move || (1..5)
+                                each=move || (1..6)
                                 key=|i| i.clone()
                                 children=|_| view! {
                                     <section class="p-4 my-4 border shadow-lg flex flex-col">
                                         <p class="w-[80ch] my-0.5 h-6 rounded bg-slate-100 animate-pulse" />
-                                        <p class="w-[32ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
-                                        <p class="w-[5ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
-                                        <p class="w-[16ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
+                                        <div class="mb-2 text-sm flex">
+                                            <div class="w-[13ch] mr-2 my-0.5 h-4 rounded bg-slate-100 animate-pulse" />
+                                            <div class="w-[10ch] mr-2 my-0.5 h-4 rounded bg-slate-100 animate-pulse" />
+                                            <div class="w-[12ch] mr-2 my-0.5 h-4 rounded bg-slate-100 animate-pulse" />
+                                        </div>
                                         <p class="w-[72ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
                                         <p class="w-[50ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
                                     </section>
