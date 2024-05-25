@@ -1,4 +1,6 @@
 use crate::layout::Layout;
+use crate::breadcrumbs::{BreadCrumbs, BreadCrumbItem};
+use crate::feeds::get_feed;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
@@ -100,6 +102,7 @@ pub async fn get_article_pdf(query: Query<ArticlePdfQuery>) -> response::Respons
 #[derive(Clone, Params, PartialEq)]
 pub struct ArticleQuery {
     url: String,
+    feed_id: i64,
 }
 
 #[component]
@@ -109,6 +112,11 @@ pub fn ArticleView() -> impl IntoView {
     let url = move || {
         query.with(|q| q.clone().unwrap().url)
     };
+
+    let feed = create_resource(
+        move || query.get().unwrap().feed_id,
+        |id| async move { get_feed(id).await.unwrap() },
+    );
 
     let article = create_resource(
         move || url(),
@@ -127,6 +135,11 @@ pub fn ArticleView() -> impl IntoView {
         }>
             {move || article.get().map(|content| { view! {
                 <Layout headline="Article".to_string()>
+                    <BreadCrumbs items=vec![
+                        BreadCrumbItem { text: "Home".to_string(), url: "/".to_string() },
+                        BreadCrumbItem { text: feed.get().unwrap().title.clone(), url: format!("/feeds/{}", feed.get().unwrap().id) },
+                        BreadCrumbItem { text: "Article".to_string(), url: url() },
+                    ] />
                     <p>
                         <a download href=format!("/article/pdf?url={}", url())>Download as PDF</a>
                     </p>

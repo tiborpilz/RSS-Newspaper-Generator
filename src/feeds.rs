@@ -1,10 +1,11 @@
 use crate::layout::Layout;
-use serde::{Deserialize, Serialize};
+use crate::breadcrumbs::{BreadCrumbItem, BreadCrumbs};
 use leptos::*;
 use leptos_router::*;
-use url::Url;
 use rss::{Channel, Item};
+use serde::{Deserialize, Serialize};
 use std::error::Error;
+use url::Url;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ssr", derive(sqlx::FromRow))]
@@ -90,7 +91,12 @@ async fn get_channel(id: i64) -> Result<Channel, ServerFnError> {
 
     let channel = match fetch_and_parse_rss(feed.url).await {
         Ok(channel) => channel,
-        Err(err) => return Err(ServerFnError::new(format!("Error fetching RSS feed: {}", err))),
+        Err(err) => {
+            return Err(ServerFnError::new(format!(
+                "Error fetching RSS feed: {}",
+                err
+            )))
+        }
     };
 
     return Ok(channel);
@@ -121,7 +127,12 @@ pub async fn add_feed(url: String) -> Result<(), ServerFnError> {
 
     let channel = match fetch_and_parse_rss(url.clone()).await {
         Ok(channel) => channel,
-        Err(err) => return Err(ServerFnError::new(format!("Error fetching RSS feed: {}", err))),
+        Err(err) => {
+            return Err(ServerFnError::new(format!(
+                "Error fetching RSS feed: {}",
+                err
+            )))
+        }
     };
 
     let pool = connect_db().await;
@@ -148,7 +159,12 @@ pub async fn update_feed_info(id: i64) -> Result<(), ServerFnError> {
 
     let channel = match fetch_and_parse_rss(feed.url).await {
         Ok(channel) => channel,
-        Err(err) => return Err(ServerFnError::new(format!("Error fetching RSS feed: {}", err))),
+        Err(err) => {
+            return Err(ServerFnError::new(format!(
+                "Error fetching RSS feed: {}",
+                err
+            )))
+        }
     };
 
     let _ = sqlx::query("UPDATE feeds SET title = ?, description = ? WHERE id = ?")
@@ -176,7 +192,8 @@ pub async fn delete_feed(id: i64) -> Result<(), ServerFnError> {
 
 #[component]
 fn FeedListItem(feed: Feed) -> impl IntoView {
-    let delete_feed = use_context::<Action<DeleteFeed, Result<(), ServerFnError>>>().expect("No delete feed action");
+    let delete_feed = use_context::<Action<DeleteFeed, Result<(), ServerFnError>>>()
+        .expect("No delete feed action");
 
     let on_click = move |_| {
         delete_feed.dispatch(DeleteFeed { id: feed.id });
@@ -218,13 +235,8 @@ pub fn FeedListView() -> impl IntoView {
     // Resource that fetches feeds from the server when either the
     // add or delete feed actions are dispatched
     let feeds = create_resource(
-        move || (
-            add_feed.version().get(),
-            delete_feed.version().get()
-        ),
-        |_| async move {
-            get_feeds().await.unwrap_or_default()
-        }
+        move || (add_feed.version().get(), delete_feed.version().get()),
+        |_| async move { get_feeds().await.unwrap_or_default() },
     );
 
     // Ref for the input element
@@ -270,8 +282,8 @@ pub struct FeedParams {
 }
 
 #[component]
-fn FeedDetailItem(item: Item) -> impl IntoView {
-    return view!{
+fn FeedDetailItem(item: Item, feed_id: i64) -> impl IntoView {
+    return view! {
         <section class="p-4 my-4 border shadow-lg">
             <p class="text-lg">
                 <a href=item.link.clone()>{item.title.clone()}</a>
@@ -280,7 +292,13 @@ fn FeedDetailItem(item: Item) -> impl IntoView {
                 {item.pub_date.clone()}
             </p>
             <p>
-                <a href=format!("/article?url={}", item.link.clone().unwrap())>Read</a>
+                <a href=format!(
+                    "/article?url={}&feed_id={}",
+                    item.link.clone().unwrap(),
+                    feed_id
+                )>
+                    Read
+                </a>
             </p>
             <p>
                 <a download href=format!("/article/pdf?url={}", item.link.unwrap())>Download as PDF</a>
@@ -296,16 +314,12 @@ pub fn FeedDetailView() -> impl IntoView {
 
     let feed = create_resource(
         move || params.get().unwrap().id,
-        |id| async move {
-            get_feed(id).await.unwrap()
-        }
+        |id| async move { get_feed(id).await.unwrap() },
     );
 
     let channel = create_resource(
         move || params.get().unwrap().id,
-        |id| async move {
-            get_channel(id).await.unwrap()
-        }
+        |id| async move { get_channel(id).await.unwrap() },
     );
 
     params.with(|p| {
@@ -318,37 +332,42 @@ pub fn FeedDetailView() -> impl IntoView {
                 <p>Loading...</p>
             </Layout>
         }>
-            {move || feed.get().map(|feed| view! {
-                <Layout headline=feed.title>
-                    <p>{feed.description}</p>
-                    <Suspense fallback=|| view! {
-                        <For
-                            each=move || (1..5)
-                            key=|i| i.clone()
-                            children=|_| view! {
-                                <section class="p-4 my-4 border shadow-lg flex flex-col">
-                                    <p class="w-[80ch] my-0.5 h-6 rounded bg-slate-100 animate-pulse" />
-                                    <p class="w-[32ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
-                                    <p class="w-[5ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
-                                    <p class="w-[16ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
-                                    <p class="w-[72ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
-                                    <p class="w-[50ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
-                                </section>
-                            }
-                        />
-                    }>
-                        {move || channel.get().map(|channel| view! {
+            {move || feed.get().map(|feed| {
+                let feed_id = feed.id.clone();
+                view! {
+                    <Layout headline=feed.title.clone()>
+                        <BreadCrumbs items=vec![
+                            BreadCrumbItem { text: "Feeds".to_string(), url: "/feeds".to_string() },
+                            BreadCrumbItem { text: feed.title.clone(), url: format!("/feeds/{}", feed.id) },
+                        ] />
+                        <Suspense fallback=|| view! {
                             <For
-                                each=move || channel.items.clone()
-                                key=|item| item.link.clone()
-                                children=|item| view! {
-                                    <FeedDetailItem item />
+                                each=move || (1..5)
+                                key=|i| i.clone()
+                                children=|_| view! {
+                                    <section class="p-4 my-4 border shadow-lg flex flex-col">
+                                        <p class="w-[80ch] my-0.5 h-6 rounded bg-slate-100 animate-pulse" />
+                                        <p class="w-[32ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
+                                        <p class="w-[5ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
+                                        <p class="w-[16ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
+                                        <p class="w-[72ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
+                                        <p class="w-[50ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
+                                    </section>
                                 }
                             />
-                        })}
-                    </Suspense>
-                </Layout>
-
+                        }>
+                            {move || channel.get().map(|channel| view! {
+                                <For
+                                    each=move || channel.items.clone()
+                                    key=|item| item.link.clone()
+                                    children=move |item| view! {
+                                        <FeedDetailItem item feed_id=feed_id.clone() />
+                                    }
+                                />
+                            })}
+                        </Suspense>
+                    </Layout>
+                }
             })}
         </Suspense>
     }
