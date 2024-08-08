@@ -41,6 +41,14 @@
             homepage = "https://github.com/leptos-rs/cargo-leptos";
             license = pkgs.lib.licenses.mit;
           };
+
+          buildInputs = [
+            rustEnv
+          ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+            pkgs.libiconv
+            pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
+            pkgs.darwin.apple_sdk.frameworks.CoreServices
+          ];
         };
 
       in
@@ -53,6 +61,10 @@
             pkgs.openssl.dev
             pkgs.pkg-config
             pkgs.nodejs
+          ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+            pkgs.libiconv
+            pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
+            pkgs.darwin.apple_sdk.frameworks.CoreServices
           ];
 
           nativeBuildInputs = [ pkgs.pkg-config ];
