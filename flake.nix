@@ -58,7 +58,7 @@
           nativeBuildInputs = [ pkgs.pkg-config ];
 
           shellHook = ''
-            export LD_LIBERARY_PATH=${pkgs.lib.makeLibraryPath [ pkgs.openssl ]};
+            export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath [ pkgs.openssl ]};
           '';
         };
       });
