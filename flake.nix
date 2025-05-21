@@ -14,7 +14,7 @@
           inherit system;
           overlays = [ rust-overlay.overlays.default ];
         };
-        rustEnv = pkgs.rust-bin.nightly."2025-04-01".minimal.override {
+        rustEnv = pkgs.rust-bin.nightly."2025-04-01".default.override {
           extensions = [ "rust-src" ];
           targets = [ "wasm32-unknown-unknown" ];
         };

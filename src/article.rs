@@ -146,17 +146,15 @@ pub async fn get_article_pdf(query: Query<ArticlePdfQuery>) -> response::Respons
     }
     doc.push(root_layout);
 
-    match doc.render(&mut Vec::new()) {
-        Ok(pdf_bytes) => {
-            Response::builder()
-                .status(StatusCode::OK)
-                .header(header::CONTENT_TYPE, "application/pdf")
-                .header(header::CONTENT_DISPOSITION, format!("attachment; filename=\"{}.pdf\"", pdf_title.replace(" ", "_").to_lowercase()))
-                .body(Body::from(pdf_bytes))
-                .unwrap()
-        }
-        Err(e) => err_response(format!("Error rendering PDF: {}", e)),
-    }
+    let mut pdf_bytes: Vec<u8> = Vec::new();
+
+    doc.render(&mut pdf_bytes).unwrap();
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "application/pdf")
+        .header(header::CONTENT_DISPOSITION, format!("attachment; filename=\"{}.pdf\"", pdf_title.replace(" ", "_").to_lowercase()))
+        .body(Body::from(pdf_bytes))
+        .unwrap()
 }
 
 #[derive(Clone, Params, PartialEq)]
