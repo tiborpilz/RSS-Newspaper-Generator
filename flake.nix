@@ -2,7 +2,7 @@
   description = "Rust-Leptos development environment for working on rss-newspaper generator";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
     flake-utils.url = "github:numtide/flake-utils";
     rust-overlay.url = "github:oxalica/rust-overlay";
   };
@@ -14,49 +14,58 @@
           inherit system;
           overlays = [ rust-overlay.overlays.default ];
         };
-        rustEnv = pkgs.rust-bin.nightly."2024-05-09".default.override {
+        rustEnv = pkgs.rust-bin.nightly."2025-04-01".minimal.override {
+          extensions = [ "rust-src" ];
           targets = [ "wasm32-unknown-unknown" ];
         };
-        
-        cargoLeptos = pkgs.rustPlatform.buildRustPackage rec {
-          pname = "cargo-leptos";
-          version = "0.2.17";
 
-          src = pkgs.fetchFromGitHub {
-            owner = "leptos-rs";
-            repo = "cargo-leptos";
-            rev = "v${version}";
-            sha256 = "sha256-W08R1ny4LyzWehnsWSMCRjCxmvV0k7ARVbmZ740hg8w=";
-          };
-
-          cargoSha256 = "sha256-kuKsBnmH3bPgwuJ1q49iHMNT47Djx9BKxcMBbJ3zqis=";
-
-          RUSTC = "${rustEnv}/bin/rustc";
-          CARGO = "${rustEnv}/bin/cargo";
-
-          doCheck = false;
-
-          meta = {
-            description = "Cargo extension for Leptos framework";
-            homepage = "https://github.com/leptos-rs/cargo-leptos";
-            license = pkgs.lib.licenses.mit;
-          };
-
-          buildInputs = [
-            rustEnv
-          ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
-            pkgs.libiconv
-            pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
-            pkgs.darwin.apple_sdk.frameworks.CoreServices
-          ];
-        };
+        # cargoLeptos = pkgs.rustPlatform.buildRustPackage rec {
+        #   pname = "cargo-leptos";
+        #   version = "v0.2.35";
+        #
+        #   src = pkgs.fetchFromGitHub {
+        #     owner = "leptos-rs";
+        #     repo = pname;
+        #     rev = version;
+        #     hash = "sha256-CNktytEm6+5QTPAlxNz07+s7gue9dA5zZM82YQOWFSw=";
+        #   };
+        #
+        #   cargoSha256 = "sha256-qHaE4ar5AhPCsGT746XBJ4DiEYP0K+qba9FeGbyY7So=";
+        #
+        #   # cargoLock = {
+        #   #   lockFile = ./nix/cargo-leptos-${version}.lock;
+        #   #   outputHashes = {
+        #   #     # "leptos_macro-0.2.11" = "sha256-7g3NfKjWl3dZ5hX6sY9cP1wRzV6oUjM8nQlT2vA0a1E=";
+        #   #     # Add other necessary output hashes here if needed
+        #   #   };
+        #   # };
+        #
+        #   RUSTC = "${rustEnv}/bin/rustc";
+        #   CARGO = "${rustEnv}/bin/cargo";
+        #
+        #   doCheck = false;
+        #
+        #   meta = {
+        #     description = "Cargo extension for Leptos framework";
+        #     homepage = "https://github.com/leptos-rs/cargo-leptos";
+        #     license = pkgs.lib.licenses.mit;
+        #   };
+        #
+        #   buildInputs = [
+        #     rustEnv
+        #   ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
+        #     pkgs.libiconv
+        #     pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
+        #     pkgs.darwin.apple_sdk.frameworks.CoreServices
+        #   ];
+        # };
 
       in
       {
         devShell = pkgs.mkShell {
           buildInputs = [
             rustEnv
-            cargoLeptos
+            pkgs.cargo-leptos
             pkgs.openssl
             pkgs.openssl.dev
             pkgs.pkg-config

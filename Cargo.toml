@@ -9,14 +9,16 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 axum = { version = "0.7", optional = true }
 console_error_panic_hook = "0.1"
-leptos = { version = "0.6", features = ["nightly"] }
-leptos_axum = { version = "0.6", optional = true }
-leptos_meta = { version = "0.6", features = ["nightly"] }
-leptos_router = { version = "0.6", features = ["nightly"] }
+leptos = { version = "0.6.13", features = ["nightly"] }
+leptos_axum = { version = "0.6.13", optional = true }
+leptos_meta = { version = "0.6.13", features = ["nightly"] }
+leptos_router = { version = "0.6.13", features = ["nightly"] }
+server_fn = { version = "=0.6.13" }
+genpdf = "0.2.0"
 tokio = { version = "1", features = ["rt-multi-thread"], optional = true }
-tower = { version = "0.4", optional = true }
+tower = { version = "0.4", features = ["util"], optional = true }
 tower-http = { version = "0.5", features = ["fs"], optional = true }
-wasm-bindgen = "0.2.92"
+wasm-bindgen = "=0.2.92"
 thiserror = "1"
 tracing = { version = "0.1", optional = true }
 http = "1"
@@ -30,9 +32,13 @@ rss = { version = "2.0.7", features = ["with-serde"] }
 readability = { git = "https://github.com/tiborpilz/readability.git", features = ["reqwest"], optional = true }
 pandoc = { version = "0.8.11", optional = true }
 chrono = { version = "0.4", features = ["serde"] }
+html_parser = { version = "0.7" }
+
+[patch.crates-io]
+stdweb = { git = "https://github.com/Dampfwalze/stdweb/", rev = "a0086b4bd9b3116edeb679fe0ca477d48e06bb32" }
 
 [features]
-hydrate = ["leptos/hydrate", "leptos_meta/hydrate", "leptos_router/hydrate"]
+hydrate = ["leptos/hydrate"]
 ssr = [
     "dep:axum",
     "dep:tokio",

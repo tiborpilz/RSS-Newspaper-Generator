@@ -15,6 +15,11 @@ use axum::{
 };
 
 #[cfg(feature = "ssr")]
+use genpdf::{elements, fonts, style, Document, Element as _};
+#[cfg(feature = "ssr")]
+use html_parser::{Dom, Node};
+
+#[cfg(feature = "ssr")]
 fn format_article(article: readability::extractor::Product) -> String {
     format!("<h1>{}</h1><p class=\"italic\">{}</p>{}", article.title, article.description, article.content)
 }
@@ -44,11 +49,9 @@ pub struct ArticlePdfQuery {
 #[cfg(feature = "ssr")]
 pub async fn get_article_pdf(query: Query<ArticlePdfQuery>) -> response::Response {
     let url = query.url.clone();
-    use std::path::PathBuf;
 
     use readability::extractor;
     use tokio::task::spawn_blocking;
-    use pandoc::{Pandoc, InputKind, InputFormat, OutputFormat, OutputKind, PandocOption};
 
     logging::log!("Scraping article: {}", url);
 
@@ -61,42 +64,99 @@ pub async fn get_article_pdf(query: Query<ArticlePdfQuery>) -> response::Respons
             .unwrap()
     };
 
-    let article = match spawn_blocking(move || {
+    let article_product = match spawn_blocking(move || { 
         extractor::scrape(&url)
     }).await.unwrap() {
-        Ok(article) => article,
+        Ok(product) => product,
         Err(e) => return err_response(format!("Error scraping article: {}", e)),
     };
 
-    // Add title to HTML as h1 tag
-    let article_html = format_article(article);
+    let pdf_title = article_product.title.clone(); 
+    
+    let article_html = format_article(article_product);
 
-    let mut pandoc = Pandoc::new();
-
-    // Convert from HTML to PDF
-    pandoc.set_input_format(InputFormat::Html, Vec::new());
-    pandoc.set_output_format(OutputFormat::Pdf, Vec::new());
-
-    pandoc.set_input(InputKind::Pipe(article_html));
-    pandoc.set_output(OutputKind::Pipe);
-
-    pandoc.add_option(PandocOption::PdfEngine(PathBuf::from("xelatex")));
-
-    // Execute pandoc
-    let result = pandoc.execute();
-    let pdf_bytes: Vec<u8> = match result {
-        Ok(pandoc::PandocOutput::ToBuffer(buffer)) => buffer.into(),
-        Ok(pandoc::PandocOutput::ToBufferRaw(buffer)) => buffer,
-        Ok(pandoc::PandocOutput::ToFile(_)) => return err_response("Pandoc output to file not supported".to_string()),
-        Err(e) => return err_response(format!("Error converting article to PDF: {}", e)),
+    let font_dir = std::env::current_dir().unwrap().join("fonts");
+    let font_family = match fonts::from_files(font_dir.clone(), "LiberationSans", None) {
+         Ok(family) => family,
+         Err(e) => {
+             let font_error_msg = format!("Failed to load LiberationSans font family. Ensure LiberationSans fonts are in a ./fonts/ directory. Error: {}. Falling back to Helvetica.", e);
+             logging::warn!("{}", font_error_msg);
+             match fonts::from_files(font_dir, "Helvetica", Some(fonts::Builtin::Helvetica)) {
+                 Ok(fallback_family) => fallback_family,
+                 Err(fallback_e) => {
+                    return err_response(format!("Failed to load fallback font Helvetica: {}. Original error: {}", fallback_e, font_error_msg));
+                 }
+             }
+         }
     };
 
-    return Response::builder()
-        .status(StatusCode::OK)
-        .header(header::CONTENT_TYPE, "application/pdf")
-        .header(header::CONTENT_DISPOSITION, format!("attachment; filename=\"article.pdf\""))
-        .body(Body::from(pdf_bytes))
-        .unwrap();
+    let mut doc = Document::new(font_family);
+    doc.set_title(pdf_title.clone()); 
+    let mut decorator = genpdf::SimplePageDecorator::new();
+    decorator.set_margins(10);
+    doc.set_page_decorator(decorator);
+
+    let dom = match Dom::parse(&article_html) {
+        Ok(dom) => dom,
+        Err(e) => return err_response(format!("Error parsing HTML: {}", e)),
+    };
+
+    fn process_node(doc_element: &mut elements::LinearLayout, node: &Node, default_style: style::Style) {
+        match node {
+            Node::Text(text) => {
+                doc_element.push(elements::Paragraph::new(text.trim().to_string()).styled(default_style));
+            }
+            Node::Element(element) => {
+                let mut current_style = default_style;
+                let tag_name = element.name.to_lowercase();
+
+                if tag_name == "h1" {
+                    current_style = style::Style::new().bold().with_font_size(24);
+                } else if tag_name == "h2" {
+                    current_style = style::Style::new().bold().with_font_size(18);
+                } else if tag_name == "h3" {
+                    current_style = style::Style::new().bold().with_font_size(16);
+                } else if tag_name == "p" {
+                    // Handled by default style for Paragraph elements, but can add specific styling here
+                } else if tag_name == "strong" || tag_name == "b" {
+                    current_style = default_style.bold();
+                } else if tag_name == "em" || tag_name == "i" {
+                    current_style = default_style.italic();
+                }
+                // TODO: Add more tag handling (lists, links, images etc.)
+
+                for child in &element.children {
+                    process_node(doc_element, child, current_style);
+                }
+
+                // Add a bit of space after block elements like p and headings
+                if tag_name == "p" || tag_name.starts_with("h") {
+                     doc_element.push(elements::Break::new(1));
+                }
+            }
+            Node::Comment(_) => { /* Ignore comments */ }
+        }
+    }
+
+    let mut root_layout = elements::LinearLayout::vertical();
+    let default_style = style::Style::new(); // Base style
+
+    for node in dom.children {
+        process_node(&mut root_layout, &node, default_style);
+    }
+    doc.push(root_layout);
+
+    match doc.render(&mut Vec::new()) {
+        Ok(pdf_bytes) => {
+            Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, "application/pdf")
+                .header(header::CONTENT_DISPOSITION, format!("attachment; filename=\"{}.pdf\"", pdf_title.replace(" ", "_").to_lowercase()))
+                .body(Body::from(pdf_bytes))
+                .unwrap()
+        }
+        Err(e) => err_response(format!("Error rendering PDF: {}", e)),
+    }
 }
 
 #[derive(Clone, Params, PartialEq)]
