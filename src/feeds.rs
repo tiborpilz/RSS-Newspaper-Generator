@@ -2,8 +2,7 @@ use crate::breadcrumbs::{BreadCrumbItem, BreadCrumbs};
 use crate::date::FormattedDate;
 use crate::layout::Layout;
 
-use leptos::html;
-use leptos::prelude::*;
+use leptos::{logging, prelude::*};
 use leptos_router::{hooks::use_params, params::Params};
 use rss::{Channel, Item};
 use serde::{Deserialize, Serialize};
@@ -239,7 +238,7 @@ pub fn FeedListView() -> impl IntoView {
     //     move || async move { get_feeds().await.unwrap() },
     //     |feeds| { feeds },
     // );
-    
+
     let feeds = OnceResource::new(get_feeds());
 
     let (url, set_url) = signal(String::new());
@@ -329,60 +328,95 @@ pub fn FeedDetailView() -> impl IntoView {
     });
 
     view! {
-        <Suspense fallback=|| view! {
+        <Suspense fallback= move || view! {
             <Layout headline="Feed Details".to_string()>
                 <p>Loading...</p>
             </Layout>
         }>
-            {move || feed.get().map(|feed| {
-                let feed = match feed {
-                    Ok(feed) => feed,
-                    Err(err) => {
-                        return view! {
-                            <Layout headline="Feed Details".to_string()>
-                                <p>{format!("Error fetching feed: {}", err)}</p>
-                            </Layout>
-                        }
-                    }
-                };
-                let feed_id = feed.id.clone();
-                view! {
+        {move || { feed.get().unwrap().map(|feed| view! {
                     <Layout headline=feed.title.clone()>
                         <BreadCrumbs items=vec![
                             BreadCrumbItem { text: "Feeds".to_string(), url: "/feeds".to_string() },
                             BreadCrumbItem { text: feed.title.clone(), url: format!("/feeds/{}", feed.id) },
                         ] />
-                        <Suspense fallback=|| view! {
-                            <For
-                                each=move || (1..6)
-                                key=|i| i.clone()
-                                children=|_| view! {
-                                    <section class="p-4 my-4 border shadow-lg flex flex-col">
-                                        <p class="w-[80ch] my-0.5 h-6 rounded bg-slate-100 animate-pulse" />
-                                        <div class="mb-2 text-sm flex">
-                                            <div class="w-[13ch] mr-2 my-0.5 h-4 rounded bg-slate-100 animate-pulse" />
-                                            <div class="w-[10ch] mr-2 my-0.5 h-4 rounded bg-slate-100 animate-pulse" />
-                                            <div class="w-[12ch] mr-2 my-0.5 h-4 rounded bg-slate-100 animate-pulse" />
-                                        </div>
-                                        <p class="w-[72ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
-                                        <p class="w-[50ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
-                                    </section>
-                                }
-                            />
-                        }>
-                            {move || channel.get().unwrap().map(|channel| view! {
-                                <For
-                                    each=move || channel.items.clone()
-                                    key=|item| item.link.clone()
-                                    children=move |item| view! {
-                                        <FeedDetailItem item feed_id=feed_id.clone() />
-                                    }
-                                />
-                            })}
-                        </Suspense>
                     </Layout>
-                }
-            })}
+            })
+        }}
         </Suspense>
     }
 }
+        //         // future=get_channel(id)
+        //         // let:channel
+        //     // {move || feed.get().map(|feed| {
+        //     //     let feed = match feed {
+        //     //         Ok(feed) => feed,
+        //     //         Err(err) => {
+        //     //             return view! {
+        //     //                 <Layout headline="Feed Details".to_string()>
+        //     //                     <p>{format!("Error fetching feed: {}", err)}</p>
+        //     //                 </Layout>
+        //     //             }
+        //     //         }
+        //     //     };
+        //         let feed_id = feed.id.clone();
+        //         view! {
+        //             <Layout headline=feed.title.clone()>
+        //                 <BreadCrumbs items=vec![
+        //                     BreadCrumbItem { text: "Feeds".to_string(), url: "/feeds".to_string() },
+        //                     BreadCrumbItem { text: feed.title.clone(), url: format!("/feeds/{}", feed.id) },
+        //                 ] />
+        //                 <Suspense fallback=|| view! {
+        //                     <For
+        //                         each=move || (1..6)
+        //                         key=|i| i.clone()
+        //                         children=|_| view! {
+        //                             <section class="p-4 my-4 border shadow-lg flex flex-col">
+        //                                 <p class="w-[80ch] my-0.5 h-6 rounded bg-slate-100 animate-pulse" />
+        //                                 <div class="mb-2 text-sm flex">
+        //                                     <div class="w-[13ch] mr-2 my-0.5 h-4 rounded bg-slate-100 animate-pulse" />
+        //                                     <div class="w-[10ch] mr-2 my-0.5 h-4 rounded bg-slate-100 animate-pulse" />
+        //                                     <div class="w-[12ch] mr-2 my-0.5 h-4 rounded bg-slate-100 animate-pulse" />
+        //                                 </div>
+        //                                 <p class="w-[72ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
+        //                                 <p class="w-[50ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
+        //                             </section>
+        //                         }
+        //                     />
+        //                 }>
+        //
+        //                 <Show when=move || channel.get().is_some() fallback=|| view! { <p>Loading...</p> }>
+        //                     <For
+        //                         each=move || channel.get().unwrap().unwrap().items.clone()
+        //                         key=|item| item.link.clone()
+        //                         children=move |item| view! {
+        //                             <FeedDetailItem item feed_id=feed_id.clone() />
+        //                         }
+        //                     />
+        //                 </Show>
+        //                     // {move || channel.get().map(|channel| {
+        //                     //     let channel =
+        //                     //         <Show when=move || channel.ok() fallback=|| view! { <p>Loading...</p> }>
+        //                     //         match channel {
+        //                     //         Ok(channel) => return view! {
+        //                     //             <For
+        //                     //                 each=move || channel.items.clone()
+        //                     //                 key=|item| item.link.clone()
+        //                     //                 children=move |item| view! {
+        //                     //                     <FeedDetailItem item feed_id=feed_id.clone() />
+        //                     //                 }
+        //                     //             />
+        //                     //         },
+        //                     //         Err(err) => {
+        //                     //             return view! {
+        //                     //                 <Layout headline="Feed Details".to_string()>
+        //                     //                     <p>{format!("Error fetching feed: {}", err)}</p>
+        //                     //                 </Layout>
+        //                     //             }
+        //                     //         }
+        //                     //     };
+        //                     // })}
+        //                 </Suspense>
+        //             </Layout>
+        //         }
+        //     })}
+        // </Suspense>
