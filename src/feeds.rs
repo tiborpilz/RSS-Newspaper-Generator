@@ -1,9 +1,10 @@
-use crate::layout::Layout;
 use crate::breadcrumbs::{BreadCrumbItem, BreadCrumbs};
 use crate::date::FormattedDate;
+use crate::layout::Layout;
 
-use leptos::*;
-use leptos_router::*;
+use leptos::html;
+use leptos::prelude::*;
+use leptos_router::{hooks::use_params, params::Params};
 use rss::{Channel, Item};
 use serde::{Deserialize, Serialize};
 use std::error::Error;
@@ -194,11 +195,8 @@ pub async fn delete_feed(id: i64) -> Result<(), ServerFnError> {
 
 #[component]
 fn FeedListItem(feed: Feed) -> impl IntoView {
-    let delete_feed = use_context::<Action<DeleteFeed, Result<(), ServerFnError>>>()
-        .expect("No delete feed action");
-
     let on_click = move |_| {
-        delete_feed.dispatch(DeleteFeed { id: feed.id });
+        delete_feed(feed.id);
     };
 
     view! {
@@ -226,35 +224,38 @@ fn FeedList(feeds: Vec<Feed>) -> impl IntoView {
 
 #[component]
 pub fn FeedListView() -> impl IntoView {
-    let add_feed = create_server_action::<AddFeed>();
-    let delete_feed = create_server_action::<DeleteFeed>();
-
-    let (error_message, set_error_message) = create_signal(String::new());
+    let (error_message, set_error_message) = signal(String::new());
 
     // Provide delete action to children
     provide_context(delete_feed);
 
     // Resource that fetches feeds from the server when either the
     // add or delete feed actions are dispatched
-    let feeds = create_resource(
-        move || (add_feed.version().get(), delete_feed.version().get()),
-        |_| async move { get_feeds().await.unwrap_or_default() },
-    );
+    // let feeds = Resource::new(
+    //     move || async move { get_feeds().await.unwrap() },
+    // );
+    //
+    // let feeds = Resource::new(
+    //     move || async move { get_feeds().await.unwrap() },
+    //     |feeds| { feeds },
+    // );
+    
+    let feeds = OnceResource::new(get_feeds());
 
-    // Ref for the input element
-    let input_element: NodeRef<html::Input> = create_node_ref();
+    let (url, set_url) = signal(String::new());
+
+    // // Ref for the input element
+    // let input_element: NodeRef<html::Input> = NodeRef::new();
 
     // On click handler for the add feed button
     // Dispatches the add feed action and resets the input
     let on_click = move |_| {
-        let input_element = input_element().expect("<input> element should be mounted");
-        let url = input_element.value();
-        if is_valid_url(url.clone()) {
-            set_error_message("".to_string());
-            add_feed.dispatch(AddFeed { url });
-            input_element.set_value("");
+        if is_valid_url(url.get()) {
+            set_error_message.set("".to_string());
+            add_feed(url.get());
+            set_url.set("".to_string());
         } else {
-            set_error_message("Invalid URL".to_string());
+            set_error_message.set("Invalid URL".to_string());
         }
     };
 
@@ -262,7 +263,12 @@ pub fn FeedListView() -> impl IntoView {
         <Layout headline="Feeds".to_string() >
             <div class="max-w-[700px]">
                 <div class="flex gap-2">
-                    <input class="p-2 rounded border flex-1" type="text" node_ref=input_element placeholder="https://example.com" />
+                    <input
+                        class="p-2 rounded border flex-1"
+                        type="text"
+                        placeholder="https://example.com"
+                        prop:value=url
+                    />
                     <button class="p-2 rounded bg-slate-100" on:click=on_click>Add Feed</button>
                 </div>
                 <Show when=move || !error_message.get().is_empty()>
@@ -270,7 +276,7 @@ pub fn FeedListView() -> impl IntoView {
                 </Show>
                 <Suspense fallback=|| view! { <p>Loading...</p> }>
                     {move || feeds.get().map(|feeds| view! {
-                        <FeedList feeds />
+                        <FeedList feeds=feeds.unwrap() />
                     })}
                 </Suspense>
             </div>
@@ -280,7 +286,7 @@ pub fn FeedListView() -> impl IntoView {
 
 #[derive(Clone, Params, PartialEq)]
 pub struct FeedParams {
-    id: i64,
+    id: Option<i64>,
 }
 
 #[component]
@@ -312,18 +318,14 @@ fn FeedDetailItem(item: Item, feed_id: i64) -> impl IntoView {
 pub fn FeedDetailView() -> impl IntoView {
     let params = use_params::<FeedParams>();
 
-    let feed = create_resource(
-        move || params.get().unwrap().id,
-        |id| async move { get_feed(id).await.unwrap() },
-    );
+    let id = params.get().unwrap().id.unwrap();
 
-    let channel = create_resource(
-        move || params.get().unwrap().id,
-        |id| async move { get_channel(id).await.unwrap() },
-    );
+    let feed = OnceResource::new(get_feed(id));
+
+    let channel = OnceResource::new(get_channel(id));
 
     params.with(|p| {
-        update_feed_info(p.clone().unwrap().id);
+        update_feed_info(p.clone().unwrap().id.unwrap());
     });
 
     view! {
@@ -333,6 +335,16 @@ pub fn FeedDetailView() -> impl IntoView {
             </Layout>
         }>
             {move || feed.get().map(|feed| {
+                let feed = match feed {
+                    Ok(feed) => feed,
+                    Err(err) => {
+                        return view! {
+                            <Layout headline="Feed Details".to_string()>
+                                <p>{format!("Error fetching feed: {}", err)}</p>
+                            </Layout>
+                        }
+                    }
+                };
                 let feed_id = feed.id.clone();
                 view! {
                     <Layout headline=feed.title.clone()>
@@ -358,7 +370,7 @@ pub fn FeedDetailView() -> impl IntoView {
                                 }
                             />
                         }>
-                            {move || channel.get().map(|channel| view! {
+                            {move || channel.get().unwrap().map(|channel| view! {
                                 <For
                                     each=move || channel.items.clone()
                                     key=|item| item.link.clone()

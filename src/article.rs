@@ -1,10 +1,14 @@
 use crate::layout::Layout;
 use crate::breadcrumbs::{BreadCrumbs, BreadCrumbItem};
 use crate::feeds::get_feed;
-use leptos::*;
+use leptos::prelude::*;
 use leptos_meta::*;
-use leptos_router::*;
+use leptos_router::{
+    params::Params,
+    hooks::use_query_map,
+};
 use serde::Deserialize;
+use leptos::logging;
 
 #[cfg(feature = "ssr")]
 use axum::{
@@ -159,33 +163,31 @@ pub async fn get_article_pdf(query: Query<ArticlePdfQuery>) -> response::Respons
 
 #[derive(Clone, Params, PartialEq)]
 pub struct ArticleQuery {
-    url: String,
-    feed_id: i64,
+    url: Option<String>,
+    feed_id: Option<i64>,
 }
 
 #[component]
 pub fn ArticleView() -> impl IntoView {
-    let query = use_query::<ArticleQuery>();
+    let query = use_query_map();
+    let url = move || query.read().get("url").unwrap();
 
-    let url = move || {
-        query.with(|q| q.clone().unwrap().url)
-    };
-
-    let feed = create_blocking_resource(
-        move || query.get().unwrap().feed_id,
-        |id| async move { get_feed(id).await.unwrap() },
+    let feed = Resource::new_blocking(
+        move || query.read().get("id").unwrap_or_default().to_string(),
+        |id| async move { get_feed(id.parse::<i64>().unwrap()).await.unwrap() },
     );
 
-    let article = create_resource(
-        move || url(),
-        |url| async move {
-            scrape_article(url).await.unwrap()
+    let article = LocalResource::new(
+        move || async move {
+            scrape_article(url()).await.unwrap()
         }
     );
 
     view! {
-        <Html lang="en" />
-        <Meta name="description" content="Article content" />
+        <Html />
+        <head>
+            <Meta name="description" content="Article content" />
+        </head>
         <Suspense fallback=|| view! {
             <Layout headline="Article".to_string()>
                 <p>Loading...</p>

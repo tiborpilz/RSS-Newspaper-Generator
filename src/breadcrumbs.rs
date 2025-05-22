@@ -1,4 +1,4 @@
-use leptos::*;
+use leptos::prelude::*;
 
 #[derive(Clone)]
 pub struct BreadCrumbItem {
@@ -16,12 +16,11 @@ pub fn BreadCrumbs(items: Vec<BreadCrumbItem>) -> impl IntoView {
                 each=move || items.clone().into_iter().enumerate()
                 key=|(_, item)| item.url.clone()
                 children=move |(index, item)| view! {
-                    <a href=item.url.clone()>{item.text.clone()}</a>
-                    {if index.clone() < count.clone() - 1 {
-                        view! { <span class="text-gray-500"> > </span> }.into_view()
-                    } else {
-                        view! { "" }.into_view()
-                    }}
+                    <a href="/">{item.text.clone()}</a>
+                    // <a href=item.url.clone()>{item.text.clone()}</a>
+                    <Show when=move || index.clone() < count.clone() - 1 fallback=||{ "" }.into_view()>
+                        <span class="text-gray-500"> > </span>
+                    </Show>
                 }
             />
         </nav>

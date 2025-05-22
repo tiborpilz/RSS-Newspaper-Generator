@@ -1,5 +1,5 @@
 use chrono::{DateTime};
-use leptos::*;
+use leptos::prelude::*;
 
 #[component]
 pub fn FormattedDate(date_string: String) -> impl IntoView {

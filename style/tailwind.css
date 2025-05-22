@@ -1,15 +1,16 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-h1 {
-    @apply text-3xl font-bold;
-}
+@layer components {
+  h1 {
+    font-size: --
+      @apply text-3xl font-bold;
+  }
 
-h2 {
-    @apply text-2xl font-bold;
-}
+  h2 {
+      @apply text-2xl font-bold;
+  }
 
-a {
-    @apply underline text-blue-600 hover:text-blue-800;
+  a {
+      @apply underline text-blue-600 hover:text-blue-800;
+  }
 }
