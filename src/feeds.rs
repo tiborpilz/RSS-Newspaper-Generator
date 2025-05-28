@@ -2,7 +2,7 @@ use crate::breadcrumbs::{BreadCrumbItem, BreadCrumbs};
 use crate::date::FormattedDate;
 use crate::layout::Layout;
 
-use leptos::{logging, prelude::*};
+use leptos::{logging, leptos_dom, prelude::*};
 use leptos_router::{hooks::use_params, params::Params};
 use rss::{Channel, Item};
 use serde::{Deserialize, Serialize};
@@ -68,12 +68,16 @@ async fn is_valid_rss_feed(url: String) -> bool {
 pub async fn get_feed(id: i64) -> Result<Feed, ServerFnError> {
     use crate::db::connect_db;
 
+    logging::log!("Fetching feed with id: {}", id);
+
     let pool = connect_db().await;
 
     let feed = sqlx::query_as::<_, Feed>("SELECT * FROM feeds WHERE id = ?")
         .bind(id)
         .fetch_one(&pool)
         .await?;
+
+    logging::log!("Fetched feed: {:?}", feed);
 
     return Ok(feed);
 }
@@ -223,25 +227,14 @@ fn FeedList(feeds: Vec<Feed>) -> impl IntoView {
 
 #[component]
 pub fn FeedListView() -> impl IntoView {
-    let (error_message, set_error_message) = signal(String::new());
+    let (error_message, set_error_message) = signal("error".to_string());
 
     // Provide delete action to children
     provide_context(delete_feed);
 
-    // Resource that fetches feeds from the server when either the
-    // add or delete feed actions are dispatched
-    // let feeds = Resource::new(
-    //     move || async move { get_feeds().await.unwrap() },
-    // );
-    //
-    // let feeds = Resource::new(
-    //     move || async move { get_feeds().await.unwrap() },
-    //     |feeds| { feeds },
-    // );
-
     let feeds = OnceResource::new(get_feeds());
 
-    let (url, set_url) = signal(String::new());
+    let (url, set_url) = signal("url".to_string());
 
     // // Ref for the input element
     // let input_element: NodeRef<html::Input> = NodeRef::new();
@@ -263,15 +256,15 @@ pub fn FeedListView() -> impl IntoView {
             <div class="max-w-[700px]">
                 <div class="flex gap-2">
                     <input
+                        bind:value=(url, set_url)
                         class="p-2 rounded border flex-1"
                         type="text"
                         placeholder="https://example.com"
-                        prop:value=url
                     />
                     <button class="p-2 rounded bg-slate-100" on:click=on_click>Add Feed</button>
                 </div>
                 <Show when=move || !error_message.get().is_empty()>
-                    <p>{error_message.get()}</p>
+                    <p>{move || error_message.get()}</p>
                 </Show>
                 <Suspense fallback=|| view! { <p>Loading...</p> }>
                     {move || feeds.get().map(|feeds| view! {
@@ -316,48 +309,114 @@ fn FeedDetailItem(item: Item, feed_id: i64) -> impl IntoView {
 #[component]
 pub fn FeedDetailView() -> impl IntoView {
     let params = use_params::<FeedParams>();
-
     let id = params.get().unwrap().id.unwrap();
 
-    let feed = OnceResource::new(get_feed(id));
+    // let id = params.get().unwrap().id.unwrap();
+    //
+    // let feed = LocalResource::new(
+    //     move || get_feed(id)
+    // );
+    let feed = Resource::new(
+        move || params.get().unwrap().id.unwrap(),
+        move |id| async move {
+            get_feed(id).await.unwrap()
+        }
+    );
 
-    let channel = OnceResource::new(get_channel(id));
+    let channel = Resource::new(
+        move || params.get().unwrap().id.unwrap(),
+        |id| get_channel(id)
+    );
 
-    params.with(|p| {
-        update_feed_info(p.clone().unwrap().id.unwrap());
-    });
+    // let channel = OnceResource::new(get_channel(id));
+
+    // params.with(|p| {
+    //     update_feed_info(p.clone().unwrap().id.unwrap());
+    // });
 
     view! {
-        <Suspense fallback= move || view! {
-            <Layout headline="Feed Details".to_string()>
-                <p>Loading...</p>
-            </Layout>
-        }>
-        {move || { feed.get().unwrap().map(|feed| view! {
-                    <Layout headline=feed.title.clone()>
-                        <BreadCrumbs items=vec![
-                            BreadCrumbItem { text: "Feeds".to_string(), url: "/feeds".to_string() },
-                            BreadCrumbItem { text: feed.title.clone(), url: format!("/feeds/{}", feed.id) },
-                        ] />
-                    </Layout>
-            })
-        }}
+        <Suspense fallback=|| view! { <div>"Loading feed…"</div> }>
+            {move || feed.get().map(|feed| view! {
+                <Layout headline=feed.title.clone()>
+                    <BreadCrumbs items=vec![
+                        BreadCrumbItem { text: "Feeds".to_string(), url: "/feeds".to_string() },
+                        BreadCrumbItem { text: feed.title, url: format!("/feeds/{}", feed.id) },
+                    ] />
+                    <Suspense fallback=|| view! {
+                        <For
+                            each=move || (1..6)
+                            key=|i| i.clone()
+                            children=|_| view! {
+                                <section class="p-4 my-4 border shadow-lg flex flex-col">
+                                    <p class="w-[80ch] my-0.5 h-6 rounded bg-slate-100 animate-pulse" />
+                                    <div class="mb-2 text-sm flex">
+                                        <div class="w-[13ch] mr-2 my-0.5 h-4 rounded bg-slate-100 animate-pulse" />
+                                        <div class="w-[10ch] mr-2 my-0.5 h-4 rounded bg-slate-100 animate-pulse" />
+                                        <div class="w-[12ch] mr-2 my-0.5 h-4 rounded bg-slate-100 animate-pulse" />
+                                    </div>
+                                    <p class="w-[72ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
+                                    <p class="w-[50ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
+                                </section>
+                            }
+                        />
+                    }>
+
+                        <Show when=move || channel.get().is_some() fallback=|| view! { <p>Loading...</p> }>
+                            <For
+                                each=move || channel.get().unwrap().unwrap().items.clone()
+                                key=|item| item.link.clone()
+                                children=move |item| view! {
+                                    <FeedDetailItem item feed_id=feed.id />
+                                }
+                            />
+                        </Show>
+                        // {move || channel.get().map(|channel| {
+                        //     let channel =
+                        //         <Show when=move || channel.ok() fallback=|| view! { <p>Loading...</p> }>
+                        //         match channel {
+                        //         Ok(channel) => return view! {
+                        //             <For
+                        //                 each=move || channel.items.clone()
+                        //                 key=|item| item.link.clone()
+                        //                 children=move |item| view! {
+                        //                     <FeedDetailItem item feed_id=feed_id.clone() />
+                        //                 }
+                        //             />
+                        //         },
+                        //         Err(err) => {
+                        //             return view! {
+                        //                 <Layout headline="Feed Details".to_string()>
+                        //                     <p>{format!("Error fetching feed: {}", err)}</p>
+                        //                 </Layout>
+                        //             }
+                        //         }
+                        //     };
+                        // })}
+                    </Suspense>
+                </Layout>
+            })}
         </Suspense>
+
+        // <Suspense fallback= move || view! {
+        //     <Layout headline="Feed Details".to_string()>
+        //         <p>Loading...</p>
+        //     </Layout>
+        // }>
+        //
+        // {move || { Suspend::new(async move || {
+        //     let feed = feed.await;
+        //     view! {
+        //         <Layout headline=feed.clone().unwrap().title>
+        //             <BreadCrumbs items=vec![
+        //                 BreadCrumbItem { text: "Feeds".to_string(), url: "/feeds".to_string() },
+        //                 BreadCrumbItem { text: feed.clone().unwrap().title, url: format!("/feeds/{}", feed.clone().unwrap().id) },
+        //             ] />
+        //         </Layout>
+        //     };
+        // })}}
+        // </Suspense>
     }
 }
-        //         // future=get_channel(id)
-        //         // let:channel
-        //     // {move || feed.get().map(|feed| {
-        //     //     let feed = match feed {
-        //     //         Ok(feed) => feed,
-        //     //         Err(err) => {
-        //     //             return view! {
-        //     //                 <Layout headline="Feed Details".to_string()>
-        //     //                     <p>{format!("Error fetching feed: {}", err)}</p>
-        //     //                 </Layout>
-        //     //             }
-        //     //         }
-        //     //     };
         //         let feed_id = feed.id.clone();
         //         view! {
         //             <Layout headline=feed.title.clone()>

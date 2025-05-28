@@ -9,15 +9,30 @@ use leptos_router::{
     components::*,
 };
 
+pub fn shell(options: LeptosOptions) -> impl IntoView {
+    view! {
+        <!DOCTYPE html>
+        <html lang="en">
+            <head>
+                <meta charset="utf-8"/>
+                <meta name="viewport" content="width=device-width, initial-scale=1"/>
+                <AutoReload options=options.clone() />
+                <HydrationScripts options/>
+                <MetaTags/>
+            </head>
+            <body>
+                <App/>
+            </body>
+        </html>
+    }
+}
+
 #[component]
 pub fn App() -> impl IntoView {
     provide_meta_context();
 
     view! {
-        <head>
-            <Stylesheet id="leptos" href="/pkg/rss-newspaper-generator.css"/>
-            <MetaTags />
-        </head>
+        <Stylesheet id="leptos" href="/pkg/rss-newspaper-generator.css"/>
 
         <Router >
             <Routes fallback=|| {
@@ -28,10 +43,10 @@ pub fn App() -> impl IntoView {
                 }
                 .into_view()
             }>
-                <Route path=path!("") view=FeedListView ssr=SsrMode::Async />
-                <Route path=path!("/feeds") view=FeedListView ssr=SsrMode::Async />
-                <Route path=path!("/feeds/:id") view=FeedDetailView ssr=SsrMode::PartiallyBlocked />
-                <Route path=path!("/article") view=ArticleView ssr=SsrMode::PartiallyBlocked />
+                <Route path=path!("") view=FeedListView />
+                <Route path=path!("/feeds") view=FeedListView />
+                <Route path=path!("/feeds/:id") view=FeedDetailView />
+                <Route path=path!("/article") view=ArticleView />
             </Routes>
         </Router>
     }
