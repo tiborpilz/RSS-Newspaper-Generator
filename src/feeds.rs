@@ -30,10 +30,7 @@ fn is_valid_url(url: String) -> bool {
         Err(_) => return false,
     };
 
-    match parsed_url.scheme() {
-        "http" | "https" => true,
-        _ => false,
-    }
+    matches!(parsed_url.scheme(), "http" | "https")
 }
 
 async fn is_valid_rss_feed(url: String) -> bool {
@@ -68,16 +65,12 @@ async fn is_valid_rss_feed(url: String) -> bool {
 pub async fn get_feed(id: i64) -> Result<Feed, ServerFnError> {
     use crate::db::connect_db;
 
-    logging::log!("Fetching feed with id: {}", id);
-
     let pool = connect_db().await;
 
     let feed = sqlx::query_as::<_, Feed>("SELECT * FROM feeds WHERE id = ?")
         .bind(id)
         .fetch_one(&pool)
         .await?;
-
-    logging::log!("Fetched feed: {:?}", feed);
 
     return Ok(feed);
 }
@@ -227,14 +220,14 @@ fn FeedList(feeds: Vec<Feed>) -> impl IntoView {
 
 #[component]
 pub fn FeedListView() -> impl IntoView {
-    let (error_message, set_error_message) = signal("error".to_string());
+    let (error_message, set_error_message) = signal(String::new());
 
     // Provide delete action to children
     provide_context(delete_feed);
 
     let feeds = OnceResource::new(get_feeds());
 
-    let (url, set_url) = signal("url".to_string());
+    let (url, set_url) = signal(String::new());
 
     // // Ref for the input element
     // let input_element: NodeRef<html::Input> = NodeRef::new();
@@ -307,15 +300,25 @@ fn FeedDetailItem(item: Item, feed_id: i64) -> impl IntoView {
 }
 
 #[component]
+fn FeedDetailItemSkeleton() -> impl IntoView {
+    return view! {
+        <section class="p-4 my-4 shadow-lg flex flex-col">
+            <p class="w-[80ch] my-0.5 h-6 rounded bg-slate-100 animate-pulse" />
+            <div class="mb-2 text-sm flex">
+                <div class="w-[13ch] mr-2 my-0.5 h-4 rounded bg-slate-100 animate-pulse" />
+                <div class="w-[10ch] mr-2 my-0.5 h-4 rounded bg-slate-100 animate-pulse" />
+                <div class="w-[12ch] mr-2 my-0.5 h-4 rounded bg-slate-100 animate-pulse" />
+            </div>
+            <p class="w-[72ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
+            <p class="w-[50ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
+        </section>
+    }
+}
+
+#[component]
 pub fn FeedDetailView() -> impl IntoView {
     let params = use_params::<FeedParams>();
-    let id = params.get().unwrap().id.unwrap();
 
-    // let id = params.get().unwrap().id.unwrap();
-    //
-    // let feed = LocalResource::new(
-    //     move || get_feed(id)
-    // );
     let feed = Resource::new(
         move || params.get().unwrap().id.unwrap(),
         move |id| async move {
@@ -328,14 +331,8 @@ pub fn FeedDetailView() -> impl IntoView {
         |id| get_channel(id)
     );
 
-    // let channel = OnceResource::new(get_channel(id));
-
-    // params.with(|p| {
-    //     update_feed_info(p.clone().unwrap().id.unwrap());
-    // });
-
     view! {
-        <Suspense fallback=|| view! { <div>"Loading feed…"</div> }>
+        <Suspense fallback=|| view! { <Layout headline="Loading feed…".to_string()><div></div></Layout> }>
             {move || feed.get().map(|feed| view! {
                 <Layout headline=feed.title.clone()>
                     <BreadCrumbs items=vec![
@@ -346,21 +343,9 @@ pub fn FeedDetailView() -> impl IntoView {
                         <For
                             each=move || (1..6)
                             key=|i| i.clone()
-                            children=|_| view! {
-                                <section class="p-4 my-4 border shadow-lg flex flex-col">
-                                    <p class="w-[80ch] my-0.5 h-6 rounded bg-slate-100 animate-pulse" />
-                                    <div class="mb-2 text-sm flex">
-                                        <div class="w-[13ch] mr-2 my-0.5 h-4 rounded bg-slate-100 animate-pulse" />
-                                        <div class="w-[10ch] mr-2 my-0.5 h-4 rounded bg-slate-100 animate-pulse" />
-                                        <div class="w-[12ch] mr-2 my-0.5 h-4 rounded bg-slate-100 animate-pulse" />
-                                    </div>
-                                    <p class="w-[72ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
-                                    <p class="w-[50ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
-                                </section>
-                            }
+                            children=|_| view! { <FeedDetailItemSkeleton /> }
                         />
                     }>
-
                         <Show when=move || channel.get().is_some() fallback=|| view! { <p>Loading...</p> }>
                             <For
                                 each=move || channel.get().unwrap().unwrap().items.clone()
@@ -370,112 +355,9 @@ pub fn FeedDetailView() -> impl IntoView {
                                 }
                             />
                         </Show>
-                        // {move || channel.get().map(|channel| {
-                        //     let channel =
-                        //         <Show when=move || channel.ok() fallback=|| view! { <p>Loading...</p> }>
-                        //         match channel {
-                        //         Ok(channel) => return view! {
-                        //             <For
-                        //                 each=move || channel.items.clone()
-                        //                 key=|item| item.link.clone()
-                        //                 children=move |item| view! {
-                        //                     <FeedDetailItem item feed_id=feed_id.clone() />
-                        //                 }
-                        //             />
-                        //         },
-                        //         Err(err) => {
-                        //             return view! {
-                        //                 <Layout headline="Feed Details".to_string()>
-                        //                     <p>{format!("Error fetching feed: {}", err)}</p>
-                        //                 </Layout>
-                        //             }
-                        //         }
-                        //     };
-                        // })}
                     </Suspense>
                 </Layout>
             })}
         </Suspense>
-
-        // <Suspense fallback= move || view! {
-        //     <Layout headline="Feed Details".to_string()>
-        //         <p>Loading...</p>
-        //     </Layout>
-        // }>
-        //
-        // {move || { Suspend::new(async move || {
-        //     let feed = feed.await;
-        //     view! {
-        //         <Layout headline=feed.clone().unwrap().title>
-        //             <BreadCrumbs items=vec![
-        //                 BreadCrumbItem { text: "Feeds".to_string(), url: "/feeds".to_string() },
-        //                 BreadCrumbItem { text: feed.clone().unwrap().title, url: format!("/feeds/{}", feed.clone().unwrap().id) },
-        //             ] />
-        //         </Layout>
-        //     };
-        // })}}
-        // </Suspense>
     }
 }
-        //         let feed_id = feed.id.clone();
-        //         view! {
-        //             <Layout headline=feed.title.clone()>
-        //                 <BreadCrumbs items=vec![
-        //                     BreadCrumbItem { text: "Feeds".to_string(), url: "/feeds".to_string() },
-        //                     BreadCrumbItem { text: feed.title.clone(), url: format!("/feeds/{}", feed.id) },
-        //                 ] />
-        //                 <Suspense fallback=|| view! {
-        //                     <For
-        //                         each=move || (1..6)
-        //                         key=|i| i.clone()
-        //                         children=|_| view! {
-        //                             <section class="p-4 my-4 border shadow-lg flex flex-col">
-        //                                 <p class="w-[80ch] my-0.5 h-6 rounded bg-slate-100 animate-pulse" />
-        //                                 <div class="mb-2 text-sm flex">
-        //                                     <div class="w-[13ch] mr-2 my-0.5 h-4 rounded bg-slate-100 animate-pulse" />
-        //                                     <div class="w-[10ch] mr-2 my-0.5 h-4 rounded bg-slate-100 animate-pulse" />
-        //                                     <div class="w-[12ch] mr-2 my-0.5 h-4 rounded bg-slate-100 animate-pulse" />
-        //                                 </div>
-        //                                 <p class="w-[72ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
-        //                                 <p class="w-[50ch] my-0.5 h-5 rounded bg-slate-100 animate-pulse" />
-        //                             </section>
-        //                         }
-        //                     />
-        //                 }>
-        //
-        //                 <Show when=move || channel.get().is_some() fallback=|| view! { <p>Loading...</p> }>
-        //                     <For
-        //                         each=move || channel.get().unwrap().unwrap().items.clone()
-        //                         key=|item| item.link.clone()
-        //                         children=move |item| view! {
-        //                             <FeedDetailItem item feed_id=feed_id.clone() />
-        //                         }
-        //                     />
-        //                 </Show>
-        //                     // {move || channel.get().map(|channel| {
-        //                     //     let channel =
-        //                     //         <Show when=move || channel.ok() fallback=|| view! { <p>Loading...</p> }>
-        //                     //         match channel {
-        //                     //         Ok(channel) => return view! {
-        //                     //             <For
-        //                     //                 each=move || channel.items.clone()
-        //                     //                 key=|item| item.link.clone()
-        //                     //                 children=move |item| view! {
-        //                     //                     <FeedDetailItem item feed_id=feed_id.clone() />
-        //                     //                 }
-        //                     //             />
-        //                     //         },
-        //                     //         Err(err) => {
-        //                     //             return view! {
-        //                     //                 <Layout headline="Feed Details".to_string()>
-        //                     //                     <p>{format!("Error fetching feed: {}", err)}</p>
-        //                     //                 </Layout>
-        //                     //             }
-        //                     //         }
-        //                     //     };
-        //                     // })}
-        //                 </Suspense>
-        //             </Layout>
-        //         }
-        //     })}
-        // </Suspense>

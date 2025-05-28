@@ -43,10 +43,10 @@ pub fn App() -> impl IntoView {
                 }
                 .into_view()
             }>
-                <Route path=path!("") view=FeedListView />
-                <Route path=path!("/feeds") view=FeedListView />
-                <Route path=path!("/feeds/:id") view=FeedDetailView />
-                <Route path=path!("/article") view=ArticleView />
+                <Route path=path!("") view=FeedListView ssr=SsrMode::PartiallyBlocked />
+                <Route path=path!("/feeds") view=FeedListView ssr=SsrMode::PartiallyBlocked />
+                <Route path=path!("/feeds/:id") view=FeedDetailView ssr=SsrMode::PartiallyBlocked />
+                <Route path=path!("/article") view=ArticleView ssr=SsrMode::PartiallyBlocked />
             </Routes>
         </Router>
     }
