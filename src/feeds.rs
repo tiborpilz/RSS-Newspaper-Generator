@@ -2,7 +2,7 @@ use crate::breadcrumbs::{BreadCrumbItem, BreadCrumbs};
 use crate::date::FormattedDate;
 use crate::layout::Layout;
 
-use leptos::{logging, leptos_dom, prelude::*};
+use leptos::{logging, leptos_dom, task::spawn_local, prelude::*};
 use leptos_router::{hooks::use_params, params::Params};
 use rss::{Channel, Item};
 use serde::{Deserialize, Serialize};
@@ -142,6 +142,8 @@ pub async fn add_feed(url: String) -> Result<(), ServerFnError> {
         .execute(&pool)
         .await;
 
+    logging::log!("Added new feed");
+
     return Ok(());
 }
 
@@ -237,8 +239,13 @@ pub fn FeedListView() -> impl IntoView {
     let on_click = move |_| {
         if is_valid_url(url.get()) {
             set_error_message.set("".to_string());
-            add_feed(url.get());
-            set_url.set("".to_string());
+            spawn_local(async move {
+                add_feed(url.get()).await.unwrap_or_else(|err| {
+                    logging::error!("Error adding feed: {}", err);
+                    set_error_message.set("Failed to add feed".to_string());
+                });
+                set_url.set("".to_string());
+            });
         } else {
             set_error_message.set("Invalid URL".to_string());
         }
@@ -277,7 +284,7 @@ pub struct FeedParams {
 #[component]
 fn FeedDetailItem(item: Item, feed_id: i64) -> impl IntoView {
     return view! {
-        <section class="p-4 my-4 border shadow-lg">
+        <section class="p-4 my-4 shadow-lg">
             <p class="text-lg">
                 <a href=format!(
                     "/article?url={}&feed_id={}",
@@ -318,18 +325,13 @@ fn FeedDetailItemSkeleton() -> impl IntoView {
 #[component]
 pub fn FeedDetailView() -> impl IntoView {
     let params = use_params::<FeedParams>();
+    let id = move || params.get().unwrap().id.unwrap();
 
-    let feed = Resource::new(
-        move || params.get().unwrap().id.unwrap(),
-        move |id| async move {
-            get_feed(id).await.unwrap()
-        }
-    );
+    let feed = Resource::new(id, move |id| async move {
+        get_feed(id).await.unwrap()
+    });
 
-    let channel = Resource::new(
-        move || params.get().unwrap().id.unwrap(),
-        |id| get_channel(id)
-    );
+    let channel = Resource::new(id, get_channel);
 
     view! {
         <Suspense fallback=|| view! { <Layout headline="Loading feed…".to_string()><div></div></Layout> }>

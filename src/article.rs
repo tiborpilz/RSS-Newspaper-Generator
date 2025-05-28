@@ -173,7 +173,7 @@ pub fn ArticleView() -> impl IntoView {
     let url = move || query.read().get("url").unwrap();
 
     let feed = Resource::new_blocking(
-        move || query.read().get("id").unwrap_or_default().to_string(),
+        move || query.read().get("feed_id").unwrap_or_default().to_string(),
         |id| async move { get_feed(id.parse::<i64>().unwrap()).await.unwrap() },
     );
 
@@ -184,10 +184,6 @@ pub fn ArticleView() -> impl IntoView {
     );
 
     view! {
-        <Html />
-        <head>
-            <Meta name="description" content="Article content" />
-        </head>
         <Suspense fallback=|| view! {
             <Layout headline="Article".to_string()>
                 <p>Loading...</p>
