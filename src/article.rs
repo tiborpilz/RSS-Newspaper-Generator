@@ -2,7 +2,6 @@ use crate::layout::Layout;
 use crate::breadcrumbs::{BreadCrumbs, BreadCrumbItem};
 use crate::feeds::get_feed;
 use leptos::prelude::*;
-use leptos_meta::*;
 use leptos_router::{
     params::Params,
     hooks::use_query_map,
@@ -34,7 +33,7 @@ pub async fn scrape_article(url: String) -> Result<String, ServerFnError> {
     use tokio::task::spawn_blocking;
 
     match spawn_blocking(move || {
-        return extractor::scrape(&url)
+        extractor::scrape(&url)
     }).await {
         Ok(article) => match article {
             Ok(article) => Ok(format_article(article)),
@@ -61,7 +60,7 @@ pub async fn get_article_pdf(query: Query<ArticlePdfQuery>) -> response::Respons
 
     let err_response = |e: String| {
         logging::error!("{}", e);
-        return Response::builder()
+        Response::builder()
             .status(StatusCode::INTERNAL_SERVER_ERROR)
             .header(header::CONTENT_TYPE, "text/plain")
             .body(Body::from(e))

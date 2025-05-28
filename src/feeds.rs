@@ -2,7 +2,7 @@ use crate::breadcrumbs::{BreadCrumbItem, BreadCrumbs};
 use crate::date::FormattedDate;
 use crate::layout::Layout;
 
-use leptos::{logging, leptos_dom, task::spawn_local, prelude::*};
+use leptos::{logging, task::spawn_local, prelude::*};
 use leptos_router::{hooks::use_params, params::Params};
 use rss::{Channel, Item};
 use serde::{Deserialize, Serialize};
@@ -67,8 +67,7 @@ pub async fn get_feed(id: i64) -> Result<Feed, ServerFnError> {
 
     let pool = connect_db().await;
 
-    let feed = sqlx::query_as::<_, Feed>("SELECT * FROM feeds WHERE id = ?")
-        .bind(id)
+    let feed = sqlx::query_as!(Feed, "SELECT * FROM feeds WHERE id = ?", id)
         .fetch_one(&pool)
         .await?;
 
@@ -98,21 +97,20 @@ async fn get_channel(id: i64) -> Result<Channel, ServerFnError> {
         }
     };
 
-    return Ok(channel);
+    Ok(channel)
 }
 
 #[server]
 pub async fn get_feeds() -> Result<Vec<Feed>, ServerFnError> {
     use crate::db::connect_db;
-    use sqlx::Row;
 
     let pool = connect_db().await;
 
-    let feeds = sqlx::query_as::<_, Feed>("SELECT * FROM feeds")
+    let feeds = sqlx::query_as!(Feed, "SELECT * FROM feeds")
         .fetch_all(&pool)
         .await?;
 
-    return Ok(feeds);
+    Ok(feeds)
 }
 
 #[server]
@@ -135,16 +133,13 @@ pub async fn add_feed(url: String) -> Result<(), ServerFnError> {
     };
 
     let pool = connect_db().await;
-    let _ = sqlx::query("INSERT INTO feeds (url, title, description) VALUES (?, ?, ?)")
-        .bind(url)
-        .bind(channel.title)
-        .bind(channel.description)
+    let _ = sqlx::query!("INSERT INTO feeds (url, title, description) VALUES (?, ?, ?)", url, channel.title, channel.description)
         .execute(&pool)
         .await;
 
     logging::log!("Added new feed");
 
-    return Ok(());
+    Ok(())
 }
 
 #[server]
@@ -153,8 +148,7 @@ pub async fn update_feed_info(id: i64) -> Result<(), ServerFnError> {
 
     let pool = connect_db().await;
 
-    let feed = sqlx::query_as::<_, Feed>("SELECT * FROM feeds where id = ?")
-        .bind(id)
+    let feed = sqlx::query_as!(Feed, "SELECT * FROM feeds where id = ?", id)
         .fetch_one(&pool)
         .await?;
 
@@ -168,14 +162,11 @@ pub async fn update_feed_info(id: i64) -> Result<(), ServerFnError> {
         }
     };
 
-    let _ = sqlx::query("UPDATE feeds SET title = ?, description = ? WHERE id = ?")
-        .bind(channel.title)
-        .bind(channel.description)
-        .bind(id)
+    let _ = sqlx::query!("UPDATE feeds SET title = ?, description = ? WHERE id = ?", channel.title, channel.description, id)
         .execute(&pool)
         .await;
 
-    return Ok(());
+    Ok(())
 }
 
 #[server]
@@ -183,24 +174,31 @@ pub async fn delete_feed(id: i64) -> Result<(), ServerFnError> {
     use crate::db::connect_db;
 
     let pool = connect_db().await;
-    let _ = sqlx::query("DELETE FROM feeds WHERE id = ?")
-        .bind(id)
+    let _ = sqlx::query!("DELETE FROM feeds WHERE id = ?", id)
         .execute(&pool)
         .await;
 
-    return Ok(());
+    Ok(())
 }
 
 #[component]
 fn FeedListItem(feed: Feed) -> impl IntoView {
+    let feeds_version = use_context::<RwSignal<i32>>()
+        .expect("Expected feeds_version context to be provided");
+
     let on_click = move |_| {
-        delete_feed(feed.id);
+        spawn_local(async move {
+            delete_feed(feed.id).await.unwrap_or_else(|err| {
+                logging::error!("Error deleting feed: {}", err);
+            });
+            feeds_version.set(feeds_version.get() + 1);
+        });
     };
 
     view! {
         <li class="flex items-center my-2">
             <a class="flex-1" href=format!("/feeds/{}", feed.id)>{feed.title}</a>
-            <button class="p-2 ml-2 rounded bg-slate-100" on:click=on_click>Delete</button>
+            <button class="p-2 ml-2 rounded bg-slate-100 cursor-pointer hover:bg-slate-200" on:click=on_click>Delete</button>
         </li>
     }
 }
@@ -223,16 +221,18 @@ fn FeedList(feeds: Vec<Feed>) -> impl IntoView {
 #[component]
 pub fn FeedListView() -> impl IntoView {
     let (error_message, set_error_message) = signal(String::new());
+    let feeds_version = RwSignal::new(0);
 
     // Provide delete action to children
     provide_context(delete_feed);
+    provide_context(feeds_version);
 
-    let feeds = OnceResource::new(get_feeds());
+    let feeds = Resource::new(
+        move || feeds_version.get(),
+        |_| get_feeds()
+    );
 
     let (url, set_url) = signal(String::new());
-
-    // // Ref for the input element
-    // let input_element: NodeRef<html::Input> = NodeRef::new();
 
     // On click handler for the add feed button
     // Dispatches the add feed action and resets the input
@@ -245,6 +245,7 @@ pub fn FeedListView() -> impl IntoView {
                     set_error_message.set("Failed to add feed".to_string());
                 });
                 set_url.set("".to_string());
+                feeds_version.set(feeds_version.get() + 1);
             });
         } else {
             set_error_message.set("Invalid URL".to_string());
@@ -261,7 +262,7 @@ pub fn FeedListView() -> impl IntoView {
                         type="text"
                         placeholder="https://example.com"
                     />
-                    <button class="p-2 rounded bg-slate-100" on:click=on_click>Add Feed</button>
+                    <button class="p-2 rounded bg-slate-100 cursor-pointer hover:bg-slate-200" on:click=on_click>Add Feed</button>
                 </div>
                 <Show when=move || !error_message.get().is_empty()>
                     <p>{move || error_message.get()}</p>
